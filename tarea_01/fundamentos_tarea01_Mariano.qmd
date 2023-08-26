@@ -1,0 +1,315 @@
+---
+title: "Tarea1: Fundamentos de Estadística"
+format: html
+editor: visual
+author: Villafuerte-Mariano (156057)
+---
+
+## Exploratorio 1
+
+### Tips
+
+Se procede a leer los datos de propinas
+
+```{r}
+#| echo: false
+#| include: false
+library(tidyverse)
+library(patchwork)
+theme_set(theme_minimal())
+## Lee los datos
+tips <- read_csv("tips.csv")
+```
+
+```{r}
+glimpse(tips)
+```
+
+Recodificar nombres y niveles
+
+```{r}
+#| echo: false
+propinas <- tips %>% 
+  rename(cuenta_total = total_bill, 
+         propina = tip, sexo = sex, 
+         fumador = smoker,
+         dia = day, momento = time, 
+         num_personas = size) %>% 
+  mutate(sexo = recode(sexo, Female = "Mujer", Male = "Hombre"), 
+         fumador = recode(fumador, No = "No", Si = "Si"),
+         dia = recode(dia, Sun = "Dom", Sat = "Sab", Thur = "Jue", Fri = "Vie"),
+         momento = recode(momento, Dinner = "Cena", Lunch = "Comida")) %>% 
+  select(-sexo) %>% 
+  mutate(dia  = fct_relevel(dia, c("Jue", "Vie", "Sab", "Dom")))
+propinas
+```
+
+#### 1. Calcula percentiles de la variable propina junto con mínimo y máxmo
+
+```{r}
+quantile(propinas$propina, probs = seq(0, 1, 0.05))
+```
+
+#### 2. Haz una gráfica de cuantiles de la variable propina
+
+```{r}
+# | include: false
+propinas <- propinas %>% 
+
+  mutate(orden_propina = rank(cuenta_total, ties.method = "first"), 
+
+         f = orden_propina / n()) 
+```
+
+```{r}
+ggplot(propinas, aes(sample=propina)) + 
+  geom_qq(distribution = stats::qunif) + 
+  xlab("f") + 
+  ylab("propina") 
+```
+
+#### 3. Haz un histograma de la variable propinas (Ajusta distintos anchos de banda)
+
+```{r}
+a<-ggplot(propinas, aes(x=propina)) + geom_histogram()
+b<-ggplot(propinas, aes(x=propina)) + geom_histogram(binwidth = 1)
+c<-ggplot(propinas, aes(x=propina)) + geom_histogram(binwidth = 0.6)
+d<-ggplot(propinas, aes(x=propina)) + geom_histogram(binwidth = 0.1)
+(a|b)/(c|d)
+```
+
+#### 4. Haz una gráfica de cuenta total contra propina
+
+```{r}
+ggplot(propinas, aes(x=cuenta_total, y=propina)) + geom_point()
+```
+
+#### 5. Calcula propina en porcentaje de la cuenta total
+
+```{r}
+propinas <- propinas %>%
+  mutate(pct_propina  = propina / cuenta_total)
+```
+
+Calcula algunos cuantiles de propina en porcentaje
+
+```{r}
+quantile(propinas$pct_propina, probs = seq(0, 1, 0.05))
+```
+
+#### 6. Haz un histograma de la propina en porcentaje. Prueba con distintos anchos de banda
+
+```{r}
+a<-ggplot(propinas, aes(x=pct_propina)) + 
+  geom_histogram()
+
+b<-ggplot(propinas, aes(x=pct_propina)) + 
+  geom_histogram(binwidth = 0.1)
+
+c<-ggplot(propinas, aes(x=pct_propina)) + 
+  geom_histogram(binwidth = 0.04)
+
+d<-ggplot(propinas, aes(x=pct_propina)) + 
+  geom_histogram(binwidth = 0.01)
+
+(a|b)/(c|d)
+```
+
+#### 7. Describe la distribución de propina en pct. ¿Hay datos atípicos?
+
+Pareciera que es una distribución concentrada en valores \~12% a \~20%
+
+Esperaba ver un poco más de acumulación en valores predeterminados como 10%, 15%, pero el qqplot parece no mostrarlos. Sí pareciera que hay unos datos menos comunes. Gente que se pone dadivosa y deja más del 40%.
+
+Todavía las personas que dejan un poco más del 20% pueda ser que es por redondear la cuenta jejeje y porque asisten a un lugar un poco más lujoso. Eso o la cuenta era en exceso baja que dejar un 10% parecería grosero.
+
+```{r}
+ggplot(propinas, aes(sample=pct_propina)) + geom_qq(distribution = stats::qunif) + 
+  xlab("f") + 
+  ylab("propina en %") 
+```
+
+8\. Filtra los casos con porcentaje de propina muy altos. ¿Qué tipos de cuentas son? ¿Son cuentas grandes o chicas?
+
+Son cuentas chicas, la realidad es que pertenecen al 20% más bajo de las cuentas. Parece ser que es el caso en el que se deja mucha propina por cortesía y para que no sea una propina muy chica en valor.
+
+```{r}
+propinas %>% filter(pct_propina>=0.25)
+```
+
+9\. Haz una diagrama de caja y brazos para propina en dolares dependiendo del momento (comida o cena).
+
+```{r}
+ggplot(propinas, aes(y = propina, x=momento)) + 
+  geom_boxplot()
+```
+
+¿Cuál parece más grande? ¿Por qué? Haz otras gráficas si es necesario.
+
+```{r}
+ggplot(propinas, aes(y = propina, x=momento, color=momento)) + 
+  geom_jitter() +
+  facet_grid(~dia)
+```
+
+Bueno.. lo primero es que tenemos datos faltantes en dìas de la semana para distintos momentos. No sabemos si son de un mismo restaurante las propinas. Asumiremos que sí, entonces la gente va a comer al restaurante entre semana y a cenar en los fines de semana.
+
+La mediana solo considerando el momento del día es superior para el grupo de las cenas.
+
+```{r}
+propinas <- propinas %>% mutate(prop_persona=propina/num_personas)
+
+ggplot(propinas, aes(y=prop_persona, x= fumador))+
+  geom_boxplot()+
+  facet_grid(~momento)
+```
+
+Pudiera ser que los fumadores nos ayuden a encontrar un patrón de comportamiento.
+
+```{r}
+propinas %>% 
+  group_by(num_personas, momento) %>%
+  summarise(conteo=n()) %>%
+  ungroup() %>%
+  pivot_wider(id_cols=num_personas, 
+              names_from = momento, 
+              values_from = conteo)
+```
+
+Nuestro restaurante es un local para parejas jejeje sobre todo para cenas. Veremos si la propina por persona va variando dependiendo del número de personas que comen.
+
+```{r}
+ggplot(propinas, aes(x=reorder(factor(num_personas), 
+                               desc(prop_persona), median), 
+                     y=prop_persona))+
+  geom_boxplot() + 
+  labs(x='Numero de personas')+
+  facet_grid(~momento) 
+```
+
+Jijijiji, las parejas tienden a verse dadivosas en la hora del romance jajaja.
+
+## Exploratorio 2
+
+### Casas
+
+```{r}
+#| echo: false
+#| include: false
+casas <- read_csv("casas.csv")
+```
+
+Un vistazo a los datos de casas
+
+```{r}
+glimpse(casas)
+```
+
+#### 1. Condición y calidad general vs precio x m2
+
+Haz una tabla de conteos de los valores de calidad general de construcción y terminados (calidad_gral). Tip: usa la función tally o summarise
+
+```{r}
+casas %>% group_by(calidad_gral) %>% 
+
+  summarise(n = n())
+
+casas %>% group_by(condicion_venta) %>% 
+
+  summarise(n = n())
+```
+
+Haz una gráfica de caja y brazos del precio x m2 para cada nivel de calidad gral ¿Qué interpretas? (tip: usa factor(variable) para convertir una variable numérica a factor)
+
+```{r}
+ggplot(casas, 
+
+       aes(x = calidad_gral, y = precio_m2, group = calidad_gral)) +
+
+  geom_boxplot() 
+
+
+ggplot(casas, 
+
+       aes(x = factor(calidad_gral), y = precio_m2)) +
+
+  geom_boxplot() 
+```
+
+#### 2. Repite el anterior con número de coches que caben en el garage.
+
+¿Cuál es la relación? ¿Qué puedes malinterpretar de esta gráfica?
+
+```{r}
+ggplot(casas , 
+
+       aes(x = factor(num_coches), y = precio_m2)) +
+
+  geom_boxplot() + geom_jitter(width = 0.2)
+
+casas %>% group_by(num_coches) %>% summarise(n = n())
+```
+
+### Té
+
+#### Lectura de los datos de tomadores de té
+
+```{r}
+#| echo: false
+#| include: false
+tea <- read_csv("tea.csv")
+```
+
+#### 3. Tablas cruzadas: azúcar y tipo de té
+
+Haz una tabla cruzada de uso de azúcar (sugar) con tipo de té (Tea), mostrando el número de casos en cada cruce. Pon el uso de azúcar en las columnas
+
+```{r}
+tea %>%
+  group_by(sugar, Tea) %>% 
+  summarise(conteo=n()) %>% 
+  ungroup() %>% 
+  pivot_wider(id_cols = Tea, names_from = sugar, values_from=conteo)
+```
+
+¿Cómo se relaciona el uso de azúcar con el té que toman las personas?
+
+Earl Grey parece ser el té más popular sin importar si lo toman con o sin azúcar y el té verde es el menos popular. Una lástima, dicen que es buenísimo jejeje. En general, pareciera que las personas prefieren no ponerle azúcar a su té.
+
+Haz una tabla de porcentajes por renglón (para cada tipo de té) de tu tabla anterior
+
+```{r}
+tea %>%
+  count(Tea, sugar) %>% 
+  group_by(Tea) %>%
+  mutate(prop_sugar = (100 * n / sum(n))) %>% 
+  ungroup() %>%
+  select(-n) %>%
+  pivot_wider(id_cols = Tea, names_from = sugar, values_from=prop_sugar)
+```
+
+#### 4. Haz una tabla cruzada para la variable Tea y la presentación (how) donde las columnas son el tipo de Té
+
+```{r}
+tea %>%
+  group_by(Tea, how) %>% 
+  summarise(conteo=n()) %>% 
+  ungroup() %>% 
+  pivot_wider(id_cols = how, names_from = Tea, values_from=conteo)
+```
+
+Ahora calcula porcentajes por columna de la tabla anterior
+
+```{r}
+tea %>%
+  count(Tea, how) %>% 
+  group_by(Tea) %>%
+  mutate(prop_tea = (100 * n / sum(n))) %>% 
+  ungroup() %>%
+  select(-n) %>%
+  pivot_wider(id_cols = how, names_from = Tea, values_from=prop_tea)
+```
+
+¿Cómo son diferentes en cuanto a la presentación los tomadores de distintos tés (negro, earl gray, etc.)?
+
+Para los tomadores de té, la bolsita es el medio más popular, los que toman té negro están un poco más abiertos a cambiar la presentación del té. En general, parece ser que la proporción de personas que son indistintas entre bolsa y unpackaged, se mantiene alrededor del 1/3.
