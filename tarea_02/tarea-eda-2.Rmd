@@ -1,0 +1,121 @@
+---
+title: "Tarea - 2"
+author: "Thomas M. Rudolf"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(error = TRUE)
+```
+
+
+Responde esta tarea, para evaluar el código de las secciones grises persiona
+Cmd/Ctrl enter sobre la línea de código a evaluar. 
+
+Cuando termines la tearea puedes presionar el botón de Knit que está en 
+la aprte superior (abajo de donde dice tarea-eda-2.Rmd) para crear un 
+documento html, como alternativa puedes
+pegar tus resultados en un documento externo.
+
+Envía tu tarea como docuemnto (pdf o html) con código y texto describiendo lo que
+observas.
+
+Recuerda cargar los paquetes que vas a usar:
+
+```{r}
+library(tidyverse)
+library(readr)
+library(plotly)
+```
+
+
+### Series de tiempo
+
+Consideramos la ventas semanales de un producto a lo largo de 5 años, 
+transformaremos la variable de ventas utilizando el logaritmo. 
+
+1. Describe que observas en la gráfica.
+Se puede observar que las ventas tienen una tendencia creciente. Tal vez no línea, sino cuadrático con un posible máximo entre 200 y 300. Adicionalmente, se nota que hay un comportamiento periódico en intervalos de 50 (0-50, 50-100, etc.) (ciclicidad) con un pico en la mitad del intervalo (+25 o +75) o un poco más después (estacionalidad). Este podría ser un senos entre 0 y pi o una polinomio de orden 2 o más con un máximo en la posición indicado.
+```{r, fig.width=5.5, fig.height = 3}
+ventas <- read_csv("ventas_semanal.csv")
+head(ventas)
+
+ggplot(ventas, aes(x = period, y = log(sales.kg))) + 
+  geom_line(linewidth = 0.3)
+```
+
+Usaremos suavizamiento con curvas loess para capturar los distintos tipos de variación que observamos en la serie. 
+
+2. Utiliza un suavizador *loess* para capturar la tendencia de la serie.
+
+```{r}
+ajuste_trend_1 <- loess(log(sales.kg) ~ period, ventas, span = 0.5,
+                        degree = 1)
+
+ventas <- ventas |> 
+  add_column(trend_1 = ajuste_trend_1$fitted,
+             res_trend_1 = ajuste_trend_1$residuals)
+
+               
+g0 <- ggplot(ventas, aes(x=period, y=log(sales.kg))) +
+  geom_line(alpha = 0.2) +
+  geom_line(aes(y = trend_1), colour = "red", size = 1.2) + xlab("días") +
+  labs(caption = "Suavizamiento apropiado")
+g0
+```
+
+
+3. Ahora calcula los residuales de este ajuste y descríbelos
+mediante un suavizamiento más fino (menos suave). Verifica que se ha estimado la mayor
+parte de la tendencia, e intenta capturar la variación estacional de los 
+residuales.
+
+Como se puede observar, la variación estacional parece un seno. El valor span = 0.2 da un buen resultado usando una relación cuadrática (red line). Usando el valor de 0.1 para span (green line) todavía más detallado. Un valor menos a span = 0.1 no llega a mejores resultados, y mantiene más ruido.
+
+```{r}
+periodic_res2_02 <- loess(res_trend_1 ~ period, ventas, span=0.2, degree = 2)
+periodic_res2_01 <- loess(res_trend_1 ~ period, ventas, span=0.1, degree = 2)
+
+g1 <- ggplot(ventas, aes(x=period, y=res_trend_1)) +
+  geom_line(alpha = 0.2) +
+  geom_line(aes(y = fitted(periodic_res2_02)), colour = "red", size = 1.2) +
+  geom_line(aes(y = fitted(periodic_res2_01)), colour = "green", size = 1.2) 
+periodic_res2 <- periodic_res2_01
+g1
+```
+
+
+4. Grafica los residuales obtenidos después de ajustar el componente 
+estacional para estudiar la componente de mayor frecuencia.
+
+```{r}
+ventas <-ventas |> 
+  add_column(periodic = periodic_res2$fitted, 
+             periodic_res = periodic_res2$residuals)
+g2 <- ggplot(ventas, aes(x=period, y=periodic), colour = "green", size = 1.0) +
+  geom_line(alpha = 0.2) +
+  geom_line(aes(y = periodic_res), colour = "red", size = 0.8)
+g2
+```
+
+
+5. (opcional) Visualiza el ajuste, genera una gráfica de páneles, en cada uno muestra
+una componente de la serie de tiempo y los residuales.
+
+```{r}
+
+ventas |< mutate(ventas, components = c("trend_1", "periodic_res"))
+g3 <- subplot(g0, g1, g2) |> 
+  layout(title = 'separeted tends: tendency, periodic, rest')
+
+annotations = list( list(text = "tendency",showarrow = FALSE),
+  list( text = "periodic",  showarrow = FALSE), 
+  list( text = "res",  showarrow = FALSE))
+
+g3 |> layout(annotations = annotations)
+g3
+```
+
