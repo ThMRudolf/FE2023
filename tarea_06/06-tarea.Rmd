@@ -1,0 +1,313 @@
+---
+title: "Tarea 06"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = TRUE)
+```
+
+1.  **Proporciones.** Usaremos datos de reincidencia en conducta
+    criminal del estado de Iowa, este estado sigue a los delincuentes
+    por un periodo de 3 años y registra el número de días hasta
+    reincidencia para aquellos que son readmitidos en prisión. El
+    departamento de correcciones utiliza los datos de reincidencia para
+    evaluar sus programas de prevención de recaída en conducta criminal.
+
+Los datos Recidivism contienen información de todos los delincuentes
+condenados por dos tipos de delito durante 2010 (*Recid* indica si
+recayeron en conducta criminal).
+
+-   De éstos $31.6\%$ reincidieron y volvieron a prisión. Utiliza
+    simulación para aproximar la simulación muestral de $\hat{p}$, la
+    proporción de delincuentes que reincidieron para muestras de tamaño
+
+    25. 
+
+-   Calcula el error estándar de $\hat{p}$, y compáralo con el teórico
+    $\sqrt{p(1-p)/n}$.
+
+-   Repite para muestras de tamaño 250 y compara.
+
+```{r}
+library(tidyverse)
+library(readr)
+library(plotly)
+library(patchwork)
+recidivism <- read_csv("Recidivism.csv")
+#glimpse(recidivism)
+set.seed(123)
+sample_filtered_by_recid <- sample_n(recidivism, 25) |>
+  group_by(Recid) |> 
+  filter(Recid == "Yes")
+res <- tibble(n_yes = nrow(sample_filtered_by_recid), 
+              N_sample = 25,
+              p_hat = n_yes/N_sample,
+              N_total = nrow(recidivism),
+              p = 36.1/100,
+              ee_p_hat = sqrt(p_hat*(1-p_hat)/N_sample),
+              ee_p_theoretical = sqrt(p*(1-p)/N_total)
+              ) |> round(2)
+# one single sample
+sprintf("Result for one single sample")
+res
+
+## repeate 250 times
+sample_estim <- function(data = recidivism, samples_n = 25, p_theo = 36.1/100){
+  #filter for Recid Yes only
+  sample_filtered_by_recid <- sample_n(recidivism, samples_n) |>
+    group_by(Recid) |> 
+    filter(Recid == "Yes")
+  # number of YES in muestra
+  n_yes = nrow(sample_filtered_by_recid)
+  # total number od prisoners
+  N_total = nrow(recidivism)
+  # percentage of YES in selection
+  p_hat = n_yes/N_total
+  # standard error of p hat and p theoretical.
+  ee_p_hat = sqrt(p_hat*(1-p_hat)/samples_n)
+  ee_p_theoretical = sqrt(p_theo*(1-p_theo)/N_total)
+  # create data frame with info
+  res <- tibble(counts_yes = n_yes, 
+              N_muestra = samples_n,
+              pHat = p_hat,
+              NTotal = N_total,
+              p = p_theo,
+              err_standard_p_hat = ee_p_hat,
+              err_standard_p_theoretical = ee_p_theoretical
+              )
+  
+  res
+}
+
+repeat_sample_estim <-function(data = recidivism, rep = 10, samples_n = 250, p_theo = 36.1/100){
+  result_reps <- map_df(1:rep, 
+                           function(id) {
+                           sample_n(data, samples_n) |> 
+                           sample_estim( samples_n, p_theo)
+                           }
+                      )
+  sprintf("Result for %0.0i samples, echa of size  %0.0i",
+        samples_n, rep)
+  result_reps
+  }
+
+sample_025 <- sample_estim(recidivism, 25)
+
+sample_250 <- sample_estim(recidivism, 250)
+reps_250 <- repeat_sample_estim(recidivism, rep = 100, samples_n = 250, p_theo = 36.1/100)
+reps_025 <- repeat_sample_estim(recidivism, rep = 100, samples_n = 25, p_theo = 36.1/100)
+
+g_reps_250 <- ggplot(reps_250, aes(x=counts_yes))+
+  geom_histogram()
+
+g_reps_025 <- ggplot(reps_025, aes(x=counts_yes))+
+  geom_histogram()
+
+g_reps_250 + g_reps_025
+```
+
+2.  **Mezcla de distribuciones**. Imaginemos que nuestro modelo teórico
+    es una mezcla de dos poblaciones, una gamma y una normal
+
+```{r}
+muestrear_pob <- function(n){
+  u <- runif(n) # número aleatorio
+  map_dbl(u, ~ ifelse(.x < 1/2, rgamma(1, 5, 0.1), rnorm(1, 100, 5)))
+}
+```
+
+El modelo teórico se puede graficar, pero también podemos obetener una
+aproximación buena haciendo una cantidad grande de simulaciones
+
+```{r}
+muestra_aprox <- muestrear_pob(10000)
+qplot(muestra_aprox, binwidth= 2)
+```
+
+Ahora consideramos estimar la media de esta distribución con un muestra
+de tamaño 50. ¿Cómo se ve la distribución de muestreo de la media?
+Grafica un histograma y una gráfica cuantil-cuantil normal.
+
+```{r}
+
+muestra_aprox_tbl = tibble(muestra_aprox)
+medias <- map_dbl(1:2000,  ~ sample_n(muestra_aprox_tbl, 50)$muestra_aprox  |> mean()) 
+
+medias_norm <- tibble(medias) |> 
+  mutate(densidad_medias_sample = dnorm(medias, mean(medias), sd(medias)))
+# Histogram
+mean_medias_sample <- mean(medias)
+g1 <- ggplot(medias_norm) +
+  geom_histogram(aes(medias)) +
+  geom_vline(xintercept = mean_medias_sample, color="red") +
+  geom_line(aes(x=medias, y = densidad_medias_sample*1000), color="green")
+
+# quantiles
+g2 <- ggplot(medias_norm, aes(sample = medias)) +
+  geom_qq(distribution = stats::qnorm) +
+  geom_qq_line(color = "red")
+
+g1 + g2
+```
+
+3.  **El error estándar de una media.** Supongamos que $x$ es una
+    variable aleatoria que toma valores en los reales con distribución
+    de probabilidad $F$. Denotamos por $\mu$ y $\sigma^2$ la media y
+    varianza de $F$,
+
+$$\mu = E(x),$$ $$\sigma^2=var(x)=E[(x-\mu)^2]$$
+
+Ahora, sea $(X_1,...,X_n)$ una muestra aleatoria de $F$, de tamaño $n$,
+la media de la muestra $\bar{X}=\sum_{i=1}^nX_i/n$ tiene:
+
+-   esperanza $\mu$,
+
+-   varianza $\sigma^2/n$.
+
+En palabras: la esperanza de $\bar{X}$ es la misma que la esperanza de
+$x$, pero la varianza de $\bar{X}$ es $1/n$ veces la varianza de $x$,
+así que entre mayor es la $n$ tenemos una mejor estimación de $\mu$.
+
+En el caso del estimador de la media $\bar{X}$, el error estándar
+quedaría
+
+$$ee(\bar{X}) = [var(\bar{X})]^{1/2}= \sigma/ \sqrt{n}.$$ Entonces,
+
+-   Consideramos los datos de ENLACE edo. de México (ENLACE era una
+    prueba estandarizada que se aplicaba a todos los alumnos de primaria
+    en México), y la columna de calificaciones de español 3^o^ de
+    primaria (`esp_3`).
+
+```{r}
+enlace <- read_csv("enlace_15.csv")
+```
+
+-   Genera un histograma de las calificaciones de 3^o^ de primaria.
+    Calcula la media y la desviación estándar.
+
+```{r}
+#glimpse(enlace)
+get_histogram_sample <- function(data2eval, n=1){
+  # n equals 1 if the whole data are evalutated, in any other case, n must be the number of      samples. 
+  x_pos_mean = mean(data2eval$esp_3) |> round(1)
+  x_pos_sd = sd(data2eval$esp_3) |> round(1)
+  x_pos_sd = x_pos_sd/n
+  grafical_result <- ggplot(data2eval) +
+    geom_histogram(aes(x = data2eval$esp_3)) +
+    geom_vline(xintercept = mean(data2eval$esp_3), color="green") +
+    annotate("text",x_pos_mean , 1, label =x_pos_mean) +
+    geom_vline(xintercept = x_pos_mean + x_pos_sd, color="red") +
+    annotate("text", x_pos_mean+x_pos_sd , .75, label =x_pos_mean+x_pos_sd) +
+    geom_vline(xintercept = x_pos_mean-x_pos_sd, color="red") +
+    annotate("text", x_pos_mean - x_pos_sd , .75, label = x_pos_mean - x_pos_sd) 
+  sprintf("mean value is:")
+  x_pos_mean 
+  sprintf("sd value is:")
+  x_pos_mean 
+  return(grafical_result)
+}
+eval_all_data <- get_histogram_sample(enlace, 1) 
+# evaluating all data, the sd doesn`t have to be devided by the number of samples n=1.
+#
+eval_all_data 
+#x_pos_mean = mean(enlace$esp_3) |> round(1)
+#x_pos_sd = sd(enlace$esp_3) |> round(1)
+#g3 <- ggplot(enlace) +
+#  geom_histogram(aes(x = enlace$esp_3)) +
+#  geom_vline(xintercept = mean(enlace$esp_3), color="green") +
+#  annotate("text",x_pos_mean , 1000, label =x_pos_mean) +
+#  geom_vline(xintercept = mean(enlace$esp_3)+sd(enlace$esp_3), color="red") +
+#  annotate("text",x_pos_mean+x_pos_sd , 750, label =x_pos_mean+x_pos_sd) +
+#  geom_vline(xintercept = mean(enlace$esp_3)-sd(enlace$esp_3), color="red") +
+#  annotate("text",x_pos_mean-x_pos_sd , 750, label =x_pos_mean-x_pos_sd) 
+#sprintf("mean value is:")
+#mean(enlace$esp_3) 
+#sprintf("sd value is:")
+#sd(enlace$esp_3) 
+#g3
+```
+
+-   Para tamaños de muestra $n = 10, 100, 1000$:
+
+```{r}
+    # sample of 10
+    num_of_samples = 10
+    sample_n10 = sample_n(enlace, num_of_samples)
+    eval_10_data <- get_histogram_sample(sample_n10, num_of_samples)
+    eval_10_data
+    # sample of 100
+    num_of_samples = 100
+    sample_n100 = sample_n(enlace, num_of_samples)
+    eval_100_data <- get_histogram_sample(sample_n100, num_of_samples)
+    eval_100_data
+    # sample of 10000
+    num_of_samples = 1000
+    sample_n1000 = sample_n(enlace, num_of_samples)
+    eval_1000_data <- get_histogram_sample(sample_n1000, num_of_samples)
+    eval_1000_data
+
+    # plot the different results
+    eval_10_data + eval_100_data + eval_1000_data
+```
+
+-   Aproximareos la distribución muestral:
+
+i)  simula 5,000 muestras aleatorias (con reemplazo),
+
+```{r}
+    data2eval = enlace
+    n_samples = 100
+    samples <- map_df(1:5000,
+                      function(id) {
+                        sample_tmp = sample_n(data2eval, n_samples, replace = TRUE)
+                      }, .id = "sample_idx" )
+```
+
+ii) calcula la media en cada muestra,
+
+```{r}
+samples_with_mean <- summarise(samples, .by = "sample_idx", mean_per_sample= mean(esp_3) |> round(2))
+```
+
+iii) Realiza un histograma de la distribución muestral de las medias
+     (las medias del paso anterior)
+
+```{r}
+ggplot(samples_with_mean, aes(x=mean_per_sample)) + 
+  geom_histogram()
+```
+
+iv) aproxima el error estándar calculando la desviación estándar de las
+    medias del paso ii.
+
+```{r}
+ee_samples <- summarise(samples, .by = "sample_idx", sd_per_sample= sd(esp_3))
+ee_samples
+
+ggplot(ee_samples, aes(x = seq(1, 5000), y = ee_samples$sd_per_sample))+
+  geom_line()
+```
+
+-   Calcula el error estándar de la media para cada tamaño de muestra
+    usando la fórmula derivada arriba y compara con tus simulaciones.
+
+```{r}
+ ee_sample_n10 <- sd( sample_n10$esp_3)/sqrt(10)
+ ee_sample_n10
+ ee_sample_n100 <- sd( sample_n100$esp_3)/sqrt(100)
+ ee_sample_n100
+ ee_sample_n1000 <- sd( sample_n1000$esp_3)/sqrt(1000)
+ ee_sample_n1000
+ sd_enlace <- sd(enlace$esp_3)
+ sd_enlace
+```
+
+-   ¿Cómo se comparan los errores estándar correspondientes a los
+    distintos tamaños de muestra?
+
+```{r}
+```
