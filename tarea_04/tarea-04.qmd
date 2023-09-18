@@ -1,0 +1,183 @@
+---
+title: "Tarea-04"
+author: "Thomas M. Rudolf"
+format:
+  html:
+    self-contained: true
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = TRUE)
+```
+
+Cargamos los paquetes que necesitaremos:
+
+```{r}
+library(tidyverse)
+library(nullabor)
+library(patchwork)
+```
+
+## Pruebas visuales y Permutación
+
+#### Pruebas de permutación
+
+1.  La tabla de datos *Phillies2009* contiene información de la temporada de baseball 2009 para el equipo de Philadelphia *Phillies*, en este ejercicio queremos comparar los strikes (`StrikeOuts`) entre los juegos en casa y de visitante:
+
+<!-- -->
+
+```{r}
+# Lectura de datos
+phillies <- read_csv("Phillies2009.csv")
+glimpse(phillies)
+```
+
+a)  Realiza un *lineup* donde cada panel muestre un diagrama de caja y brazos para la variable de interés separando los juegos jugados en casa (home) y los juegos jugados fuera (away). ¿Puedes localizar los datos verdaderos entre los nulos?
+
+```{r}
+# Line up data
+set.seed(123)
+perms_Location <- lineup(null_permute("Location"), phillies, n = 12)
+glimpse(perms_Location)
+ggplot(perms_Location, aes(x = Location, y = StrikeOuts)) +
+  geom_boxplot() +
+  facet_wrap(~.sample)
+
+#"nsW7 Ykjk l3 gCPljlC3 4b"
+decrypt("nsW7 Ykjk l3 gCPljlC3 4b")
+```
+
+b)  Calcula el promedio de strikes por juego en cada grupo (donde grupo se define por Location).
+
+    ```{r}
+
+    resumen_Strikes <- phillies  |>  group_by(Location) |> 
+      summarise(media_Strikes = mean(StrikeOuts)) |> 
+      pivot_wider(names_from = Location, values_from = media_Strikes) |> 
+      mutate(difference = Home - Away)
+      
+    glimpse(resumen_Strikes)
+    ```
+
+c)  Realiza una prueba de permutación para la diferencia de las medias. Grafica la distribución de referencia y calcula el valor *p* de dos colas.
+
+    ```{r}
+    set.seed(123)
+    Location_StrikeOut_tbl <- phillies  |>  select(Location, StrikeOuts)
+    # cinco mil permutaciones
+    perms_StrikeOuts <- lineup(null_permute("StrikeOuts"), 
+                            Location_StrikeOut_tbl, n = 5000)
+    #glimpse(perms_StrikeOuts)
+
+    perm_test <- perms_StrikeOuts |> 
+      group_by(.sample, Location) |> 
+      summarise(mean_values_per_sample = mean(StrikeOuts)) |> 
+      pivot_wider(names_from = Location, values_from = mean_values_per_sample) |> 
+      mutate(difference_per_sample = Home - Away)
+
+    g1 <- ggplot(perm_test, aes(sample=difference_per_sample)) +
+      geom_qq(distribution=stats::qunif) + 
+      geom_hline(yintercept = resumen_Strikes$difference, color = "red") +
+      xlab("f") + ylab("difference home-away") +labs(subtitle = "Distribucion nula o de referencia")
+
+    g2 <- ggplot(perm_test, aes(x=difference_per_sample)) + 
+      geom_histogram(binwidth = 0.04) + 
+      coord_flip() +
+      xlab("") +  labs(subtitle = "")
+
+    g1 + g2
+
+    dist_ref <- ecdf(resumen_Strikes$difference)
+    valor_p <- 2 * min(dist_ref(resumen_Strikes$difference), (1 - dist_ref(resumen_Strikes$difference)))
+    valor_p
+    ```
+
+## Pruebas pareadas
+
+En este ejemplo buscamos comparar la diferencia entre dos medicinas para dormir.
+
+\- ID es el identificador de paciente, group el identificador de la medicina, y extra son las horas extras de sueño.\
+
+\- Examina los datos.
+
+```{r}
+sleep
+```
+
+La pregunta de interés es si una medicina es mejor que otra para prolongar el sueño. Nótese que en este caso, no tenemos grupos, sino mediciones repetidas.
+
+-   Escribe la hipótesis nula. La hipotésis nula es que ambas medicinas tienen el mismo efecto con respecto a la prolongación de sueño. Prolongación medicina 1 (pm1) = Prolongación medicina 2 (pm2)
+
+-   Nuestra estadística de interés es media de las diferencias entre las medicinas. Calcula la diferencia observada.
+
+```{r}
+sleep <- sleep |> 
+      group_by(group)|> 
+      pivot_wider(names_from = group, values_from = extra) |> 
+      rename(pm1 = "1", pm2 = "2") |> 
+      mutate(difference_sleep = pm1 -pm2)
+
+glimpse(sleep)
+```
+
+-   Hay variación entre los pacientes. ¿Tenemos evidencia para rechazar que son iguales? ¿Cómo hacemos nuestra distribución de referencia?
+
+```{r}
+perm_sleep <- sleep |> 
+      group_by(.sample, ID)|> 
+      summarise()
+      pivot_wider(names_from = group, values_from = extra) |> 
+      mutate(difference_sleep = pm1 -pm2)
+    diff_patient
+```
+
+```         
+Parece que si hay una diferencia entre el tiempo de horas extras por paciente. Solo con el paciente Id 5 se queda igual, los demas tiene entre 0.8 horas y 2.4 horas mas.
+```
+
+-   Haz una gráfica de la distribución de referencia y grafica encima el valor observado en los datos originales.
+
+```{r}
+    set.seed(2)
+    reps_group <- lineup(null_permute("1"), sleep_pivot, n = 200)
+    valores_ref <- reps_group |>
+      group_by(.sample) |> 
+      mutate(difference =X1-X2)
+        
+    g_3 <- ggplot(valores_ref, aes(sample=difference)) + 
+      geom_qq(distribution=stats::qunif) + 
+      xlab("f") + ylab("difference sleeping time") +labs(subtitle = "Distribucion nula o de referencia")
+    g_3
+
+    g_4 <- ggplot(valores_ref, aes(x = difference)) + 
+      geom_histogram() +
+      coord_flip()
+    g_4
+```
+
+-   Calcula el valor p (justifica porque a una o dos colas).
+
+    -   Se puede justifcar el uso del valor p de dos colas, porque nos interesa si hay una diferencia o no. Al final, la medicina "2" puede ser no "peor" que la medicina "1" o visa versa. Como se ve en los datos, la medicina "2" parece de dar mejores resultados y como es son los datos que permutea, la hipotesis alterna puede ser que pm1 \< pm2. Por lo tanto, por estos datos uno una cola.
+
+```{r}
+        # Función de distribución acumulada (inverso de función de cuantiles)
+        dist_perm <- ecdf(valores_ref$difference)
+        # Calculamos el percentil del valor observado
+        percentil_obs <- dist_perm(is.na(valores_ref))
+        valor_p_medicina <- 1-mean(percentil_obs)
+```
+
+## Valores-*p (opcional)*
+
+Cuando usamos simulación para pruebas de permutación, el valor-*p* de una cola se puede calcular como
+
+$$\hat{P}=(X+1)/(N+1)$$ donde $X$ es el número de estadísticas de prueba remuestreadas que son al menos tan extremas como la observada. Supongamos que el verdadero valor *p* (si pudiéramos hacer todas las permutaciones de manera exhaustiva) es $p$\
+
+\- ¿Cuál es la varianza de $\hat{P}$?
+
+\- ¿Cuál es la varianza de $\hat{P_2}$ para la prueba de dos lados? (suponiendo que $p$ no es cercano a $0.5$, donde $p$ es el verdadero valor *p* para la prueba de una cola).
+
+## Pruebas de hipótesis *(opcional)*
+
+Ve el video [Is Most Published Research Wrong?](https://www.youtube.com/watch?v=42QuXLucH3Q)
