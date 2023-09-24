@@ -1,0 +1,289 @@
+---
+title: "Tarea-7"
+output: html_document
+date: "2023-09-22"
+author: "Thomas M. Rudolf"
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readr)
+library(plotly)
+library(patchwork)
+```
+
+### Graficas de cuantiles normales
+
+Para las siguientes distribuciones toma una muestra de tamaño 1000 y
+realiza 1) una gráfica de cuantiles muestrales, 2) un histograma, 3) una
+gráfica de cuantiles normales:
+
+-   Log-normal(0, 2)
+
+```{r}
+
+x_df <- tibble(x = seq(0, 0.999, 0.001))
+sample_lnorm_1000_tbl <- tibble(x = seq(0, 0.999, 0.001)) |> 
+  mutate(density = dlnorm(x, 1, 2)) |> 
+  mutate(sample_1000 = rlnorm(1000, 1, 2))
+
+graph_0_lognorm <- ggplot(sample_lnorm_1000_tbl, aes(sample = sample_1000)) +  geom_qq(distribution = stats::qunif) +
+  ggtitle("lognorm quantiles")
+
+
+graph_1_lognorm <- ggplot(sample_lnorm_1000_tbl, aes(sample = sample_1000)) +
+  geom_qq(distribution = qlnorm, dparam = list(meanlog=0, sdlog = 2 )) + #geom_qq(distribution = stats::qlnorm)
+  geom_qq_line(colour = "red") +
+  ggtitle("lognorm vs lognorm distribution")
+
+graph_2_lognorm <- ggplot(sample_lnorm_1000_tbl, aes(sample_1000)) +
+    geom_histogram() + 
+    ggtitle("Histogram")
+  
+graph_3_lognorm <- ggplot(sample_lnorm_1000_tbl, aes(sample = sample_1000)) +
+  geom_qq(distribution = stats::qnorm) +
+  geom_qq_line(colour = "red") +
+  ggtitle("lognorm vs norm")
+  
+ graph_0_lognorm + graph_1_lognorm + graph_2_lognorm + graph_3_lognorm
+```
+
+-   Gamma(2, 2)
+
+```{r}
+sample_gamma_1000_tbl <- tibble(x = seq(0, 0.999, 0.001)) |> 
+  mutate(density = dgamma(x, 2, 2)) |> 
+  mutate(sample_1000 = rgamma(1000, 2, 2))
+
+graph_0_gamma <- ggplot(sample_gamma_1000_tbl, aes(sample = sample_1000)) +geom_qq(distribution = stats::qunif) +
+  ggtitle("gamma quantiles")
+
+
+graph_1_gamma <- ggplot(sample_gamma_1000_tbl, aes(sample = sample_1000)) +
+  geom_qq(distribution = qgamma, dparams = list(shape = 2, rate = 2)) +
+  geom_qq_line(colour = "red")+
+  ggtitle("gamma vs gamma distribution")
+
+
+
+graph_2_gamma <- ggplot(sample_gamma_1000_tbl, aes(sample_1000)) +
+  geom_histogram()+
+  ggtitle("gamma Histogram")
+
+  
+graph_3_gamma <- ggplot(sample_gamma_1000_tbl, aes(sample = sample_1000)) +
+  geom_qq(distribution = stats::qnorm) +
+  geom_qq_line(colour = "red")+
+  ggtitle("gamma vs norm")
+
+  
+  graph_0_gamma +graph_1_gamma + graph_2_gamma + graph_3_gamma
+
+```
+
+-   Student-t con 1 grado de libertad
+
+```{r}
+sample_student_degree_1_1000_tbl <- tibble(x = seq(0, 0.999, 0.001)) |> 
+  mutate(density = dt(x, 1)) |> 
+  mutate(sample_1000 = rt(1000, 1))
+
+graph_1_student_degree_0 <- ggplot(sample_student_degree_1_1000_tbl, aes(sample = sample_1000))+ geom_qq(distribution = stats::qunif)+
+  ggtitle("student distribution dof = 1 quantiles")
+
+graph_1_student_degree_1 <- ggplot(sample_student_degree_1_1000_tbl, aes(sample = sample_1000)) +
+  geom_qq(distribution = qt, dparams = list(df = 1)) +
+  geom_qq_line(colour = "red") +
+  ggtitle("student distribution dof = 1")
+
+
+graph_2_student_degree_1 <- ggplot(sample_student_degree_1_1000_tbl, aes(sample_1000)) +
+    geom_histogram() +
+  ggtitle("student distribution dof = 1 Histogram")
+  
+graph_3_student_degree_1 <- ggplot(sample_student_degree_1_1000_tbl, aes(sample = sample_1000)) +
+  geom_qq(distribution = stats::qnorm) +
+  geom_qq_line(colour = "red") +
+  ggtitle("student distribution dof = 1 vs norm")
+  
+  graph_1_student_degree_0 + graph_1_student_degree_1 + graph_2_student_degree_1 + graph_3_student_degree_1
+
+```
+
+-   Student-t con 10 grado de libertas
+
+```{r}
+sample_student_degree_10_1000_tbl <- tibble(x = seq(0, 0.999, 0.001)) |> 
+  mutate(density = dt(x, 10)) |> 
+  mutate(sample_1000 = rt(1000, 10))
+graph_0_student_degree_10 <- ggplot(sample_student_degree_10_1000_tbl, aes(sample = sample_1000)) +  geom_qq(distribution = stats::qunif) +
+  ggtitle("student distribution dof = 10 quantiles")
+
+graph_1_student_degree_10 <- ggplot(sample_student_degree_10_1000_tbl, aes(sample = sample_1000)) +
+  geom_qq(distribution = qt, dparams = list(df = 10)) +
+  geom_qq_line(colour = "red") +
+  ggtitle("student distribution dof = 10 quantiles")
+
+graph_2_student_degree_10 <- ggplot(sample_student_degree_10_1000_tbl, aes(sample_1000)) +
+    geom_histogram() +
+  ggtitle("student distribution dof = 10 Histogram")
+  
+graph_3_student_degree_10 <- ggplot(sample_student_degree_10_1000_tbl, aes(sample = sample_1000)) +
+  geom_qq(distribution = stats::qnorm) +
+  geom_qq_line(colour = "red") +
+  ggtitle("student distribution dof = 10  vs norm")
+  
+  graph_0_student_degree_10 + graph_1_student_degree_10 + graph_2_student_degree_10 + graph_3_student_degree_10
+
+
+```
+
+### Bootstrap
+
+1.  Se realiza un experimento en el que se seleccionan 7 ratones de
+    manera aleatoria de un total de 16 ratones. A los siete
+    seleccionados se les suministra un tratamiento mientras que los
+    restantes formarán el grupo de control. El objetivo del tratamiento
+    es prolongar la supervivencia de los ratones. La siguiente tabla
+    muestra el tiempo de supervivencia en días después de suministrar el
+    tratamiento.
+
+| Grupo       | Datos                                | Tamaño de muestra |
+|-------------|--------------------------------------|-------------------|
+| Tratamiento | 94, 197, 16, 38, 99, 141, 23         | 7                 |
+| Control     | 52, 104, 146, 10, 51, 30, 40, 27, 46 | 9                 |
+
+1.  Usa las medias de las muestras para determinar si hay diferencias en
+    los grupos, esto es calcula $\bar{x}-\bar{y}$.\
+
+```{r}
+treatment_group <- c(94, 197, 16, 38, 99, 141, 23)
+control_group <- c(52, 104, 146, 10, 51, 30, 40, 27, 46)
+group_med_treat_tbl <- tibble(treatment = treatment_group)
+group_med_control_tbl <- tibble(control = control_group)
+
+diffence_in_group = mean(treatment_group) - mean(control_group)
+diffence_in_group
+```
+
+2.  Estima el error estándar de la diferencia usando bootsrap.\
+
+```{r}
+set.seed(123)
+treatment_mean_bootstrap <- map_dbl(1:500, ~ group_med_treat_tbl |>  
+    slice_sample(n = 7, replace = TRUE) |>
+    summarise(mean_med_treat = mean(treatment), .groups = "drop") |> pull(mean_med_treat)) 
+
+control_mean_bootstrap <- map_dbl(1:500, ~ group_med_control_tbl|>  
+    slice_sample(n = 9, replace = TRUE) |>
+    summarise(mean_med_control = mean(control), .groups = "drop") |> pull(mean_med_control)) 
+
+exp_bootstrap_tbl <- tibble(tmb = treatment_mean_bootstrap, 
+                            cmb = control_mean_bootstrap) |> 
+  mutate(mean_diff = tmb - cmb)
+ggplot(exp_bootstrap_tbl, aes(x = mean_diff)) +
+  geom_histogram() +
+  geom_vline(xintercept  = mean(exp_bootstrap_tbl$mean_diff), color = "red")
+
+ee_diff <- sd(exp_bootstrap_tbl$mean_diff)
+ee_diff
+```
+
+3.  ¿Dirías que el tratamiento incrementó la supervivencia de los
+    ratones?
+
+```{r}
+quantile(exp_bootstrap_tbl$mean_diff, c(0.2, 1))
+```
+
+El tratameinto si incrementó la supervivencia de los ratones, pero
+solamente con un intervalo de confianza de aproximadado $80\%$.
+
+5\. Supongamos que deseamos comparar los grupos usando las medianas en
+lugar de las medias, estima la diferencia de las medias y usa bootstrap
+para estimar el error estándar de la diferencia.
+
+```{r}
+set.seed(124)
+treatment_median_bootstrap <- map_dbl(1:5000, ~ group_med_treat_tbl |>  
+    slice_sample(n = 7, replace = TRUE) |>
+    summarise(median_med_treat = median(treatment), .groups = "drop") |> pull(median_med_treat)) 
+
+control_median_bootstrap <- map_dbl(1:5000, ~ group_med_control_tbl|>  
+    slice_sample(n = 9, replace = TRUE) |>
+    summarise(median_med_control = median(control), .groups = "drop") |> pull(median_med_control)) 
+
+exp_bootstrap_median_tbl <- tibble(tmb = treatment_median_bootstrap, 
+                            cmb = control_median_bootstrap) |> 
+  mutate(median_diff = tmb - cmb)
+ggplot(exp_bootstrap_median_tbl, aes(x = median_diff)) +
+  geom_histogram() +
+  geom_vline(xintercept  = mean(exp_bootstrap_median_tbl$median_diff), color = "red")
+
+ee_diff_median <- sd(exp_bootstrap_median_tbl$median_diff)
+ee_diff_median
+quantile(exp_bootstrap_median_tbl$median_diff, c(0.35, 1))
+```
+
+Creo que en este caso, usar los medianas no es la mejor opción.
+
+2.  **Bootstrap correlación.** Nuevamente trabaja con los datos
+    `primaria`, selecciona una muestra aleatoria de tamaño $100$ y
+    utiliza el principio del *plug-in* para estimar la correlación entre
+    la calificación de $y=$español $3$ y la de $z=$español $6$:
+    $\hat{corr}(y,z)$. Usa bootstrap para calcular el error estándar de
+    la estimación.
+
+```{r}
+enlace <- read_csv("enlace_15.csv")
+set.seed(125)
+
+## useful functions
+# get the bootstrap samples
+sample_bootstrap <- function(data_2_slide)
+{
+  (slice_sample(data_2_slide, prop = 1, replace = TRUE))
+}
+
+# estimate the cross correlation
+calc_estimador <- function(data_2_calc){
+  corr_esp <- data_2_calc |> 
+    summarise(xcorr = cor(esp_3, esp_6)) |> 
+    pull(xcorr)
+   
+  return(corr_esp)
+}
+# get the sample of 100
+sample_of_100_4_corr <- slice_sample(enlace, n = 100) |> 
+  select(esp_3, esp_6)
+
+xcorr_esp3_esp6_tbl <- tibble(xcorr =
+map_dbl(1:10000, ~calc_estimador(sample_bootstrap( data_2_slide = sample_of_100_4_corr))))
+
+xcorr_esp3_esp6_tbl
+
+xcoor_from_original_sample <- calc_estimador(sample_of_100_4_corr)
+
+ee_estim_xcorr = sd(xcorr_esp3_esp6_tbl$xcorr)
+xcorr_quantile <- quantile(xcorr_esp3_esp6_tbl$xcorr, c(0.05, 0.95))
+
+g_bootstrap <- ggplot(xcorr_esp3_esp6_tbl, aes(x = xcorr)) +
+  geom_histogram(bins = 25) +
+  geom_vline(xintercept = xcoor_from_original_sample, color = "green")+ 
+  geom_vline(xintercept = xcoor_from_original_sample-ee_estim_xcorr, color = "red") +
+  geom_vline(xintercept = xcoor_from_original_sample+ee_estim_xcorr, color = "red") +
+  geom_vline(xintercept = xcorr_quantile[1], color = "blue") +
+  geom_vline(xintercept = xcorr_quantile[2], color = "blue")
+
+g_bootstrap
+
+ee_estim_xcorr
+
+```

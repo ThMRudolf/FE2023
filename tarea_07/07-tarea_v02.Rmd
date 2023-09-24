@@ -1,0 +1,118 @@
+---
+title: "Tarea-7"
+output: html_document
+date: "2023-09-22"
+author: "Thomas M. Rudolf"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readr)
+library(plotly)
+library(patchwork)
+```
+### Graficas de cuantiles normales
+
+Para las siguientes distribuciones toma una muestra de tamaño 1000 y realiza 
+1) una gráfica de cuantiles muestrales, 2) un histograma, 3) una gráfica de cuantiles normales:
+```{r}
+## declation of usrfull function
+
+## graphs for different distributions:
+
+get_graphs_diff_dist <- function(seq_x, dist_fct = dlnorm, rdist_fct = rlnorm, dist_quantil = "qd", n=1000, dist_param1 = 0, dist_param2 = 2 ){
+  sample_1000_tbl <- seq_x |> mutate(density = dist_fct(x, dist_param1, dist_param2) ) |> 
+    mutate(sample_1000 = rdist_fct(n, dist_param1, dist_param2))
+  
+  if(dist_quantil == "qlnorm")
+  {
+    geom_object_qq <- geom_qq(distribution = stats::qlnorm)
+  }
+  if(dist_quantil == "qt")
+  {
+    geom_object_qq <- geom_qq(distribution = stats::qt)
+  }
+  
+  
+  graph_1_quantiles <- ggplot(sample_1000_tbl, aes(sample = sample_1000)) +
+  geom_object_qq +
+  geom_qq_line(colour = "red")
+  geom_line()
+  
+  graph_2_hist <- ggplot(sample_1000_tbl, aes(sample_1000)) +
+    geom_histogram()
+  
+  graph_3_norm <- ggplot(sample_1000_tbl, aes(sample = sample_1000)) +
+  geom_qq(distribution = stats::qnorm) +
+  geom_qq_line(colour = "red")
+  geom_line()
+  
+  
+  graph_results <- graph_1_quantiles + graph_2_hist +graph_3_norm
+  
+  sample_1000_tbl
+  
+  return(graph_results)
+}
+
+```
+
+* Log-normal(0, 2)
+``` {r}
+x_df <- tibble(x = seq(0, 0.999, 0.001))
+graph_lognorm <- get_graphs_diff_dist(x_df, dlnorm, rlnorm, dist_quantil = "qlnorm", n=1000, 0, 2)
+graph_lognorm
+```
+
+* Gamma(2, 2)
+```{r}
+graph_gamma <- get_graphs_diff_dist(x_df, dgamma, rgamma, dist_quantil = "qgamma", n=1000, 2, 2)
+graph_gamma
+
+```
+
+* Student-t con 1 grado de libertad
+```{r}
+graph_student_t_1degree <- get_graphs_diff_dist(x_df, dt, rt, dist_quantil = "qt", n=1000, 1, 2)
+graph_student_t_1degree
+```
+
+
+* Student-t con 10 grado de libertas
+```{r}
+graph_student_t_10degree <- get_graphs_diff_dist(x_df, dt, rt, dist_quantil = "qt", n=1000, 2, 2)
+graph_student_t_10degree
+```
+
+### Bootstrap
+
+1. Se realiza un experimento en el que se seleccionan 7 ratones de manera aleatoria de un total de 16 ratones. A los siete seleccionados se les suministra un 
+tratamiento mientras que los restantes formarán el grupo de control. El objetivo
+del tratamiento es prolongar la supervivencia de los ratones. La siguiente tabla
+muestra el tiempo de supervivencia en días después de suministrar el tratamiento.
+
+Grupo  |     Datos   |     Tamaño de muestra
+-------|-------------|---------------------------
+Tratamiento | 94, 197, 16, 38, 99, 141, 23 | 7
+Control     | 52, 104, 146, 10, 51, 30, 40, 27, 46 | 9
+
+1. Usa las medias de las muestras para determinar si hay 
+diferencias en los grupos, esto es calcula $\bar{x}-\bar{y}$.  
+2. Estima el error estándar de la diferencia usando bootsrap.  
+3. ¿Dirías que el tratamiento incrementó la supervivencia de los ratones?
+5. Supongamos que deseamos comparar los grupos usando las medianas en lugar 
+de las medias, estima la diferencia de las medias y usa bootstrap para
+estimar el error estándar de la diferencia. 
+
+2. **Bootstrap correlación.** Nuevamente trabaja con los datos `primaria`, 
+selecciona una muestra aleatoria de tamaño $100$ y utiliza el principio del 
+_plug-in_ para estimar la correlación entre la calificación de $y=$español $3$ y la de $z=$español $6$: $\hat{corr}(y,z)$. Usa bootstrap para calcular el error estándar de la estimación.
+
+```{r}
+enlace <- read_csv("enlace_15.csv")
+```
+
