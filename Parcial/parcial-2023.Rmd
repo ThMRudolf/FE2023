@@ -33,7 +33,7 @@ library(purrr)
 #library(lineup)
 library(nullabor)
 library(ggplot2)
-#functiones_auxiliares
+#source("functiones_auxiliares")
 ```
 
 ## Pruebas de hipótesis
@@ -131,8 +131,8 @@ g_valor_hist <- ggplot(valores_ref, aes(x = diff)) +
 g_valor_ref_q + g_valor_hist
 
 
-disp_perm <- 
-# reference values
+disp_perm <- ecdf(valores_ref$diff)
+2 * min(disp_perm(diff_material$diff_mat), (1-disp_perm(diff_material$diff_mat)))
 ```
 
 3.  Después de discutir con los responsables del proyecto descubrimos
@@ -143,8 +143,59 @@ disp_perm <-
     ¿Cambian tus conclusiones?
 
 ```{r}
+# visualisación 
+set.seed(123)
 zapatos <- read_csv("datos/zapatos-2.csv")
 zapatos
+g_desgaste_por_nino <-ggplot(zapatos, aes(y = desgaste)) +
+  geom_point(aes(x = zapatos$material))+
+  facet_wrap(~ niño) +
+  xlab("material") + ylab("desgaste")
+
+g_desgaste_por_nino
+```
+
+Explicación:
+
+```{r}
+zapatos_tbl <- zapatos %>% group_by(niño) %>% 
+  pivot_wider(names_from = niño, values_from = desgaste) %>% 
+  bind_rows(diff = zapatos_tbl[1,] - zapatos_tbl[2,])
+
+zapatos_tbl
+#diff_material_per_child <- zapatos_tbl[3,2:11]
+# se tomo los valores de la diferencia de desgaste de por niños via "copy and paste" para hacer el nuevo dada frame y analizarlo (dmpc = difference of material per child).
+dmpc_tbl <- tibble(dmpc = c(-0.800, -0.600, -0.300,  0.100, -1.10, 0.200, -0.300,  -0.5,  -0.5, -0.300))
+
+
+calc_diferencia_2 <- function(data){
+  data %>% 
+    group_by(dmpc) %>% 
+    summarise(wear = mean(dmpc), .group = 'drop') %>% 
+    pull(wear)
+}
+mean_org <- mean(calc_diferencia_2(dmpc_tbl))
+set.seed(123)
+reps <- lineup(null_permute("dmpc"), dmpc_tbl, n = 10000)
+# decrypt("nsW7 Ykjk l3 gCPljlC3 FFbb")
+valores_ref2 <- reps %>% 
+  group_by(.sample) %>% 
+  nest() %>% 
+  mutate(diff = lapply(data, calc_diferencia_2)) %>% 
+  unnest(diff)
+
+valores_ref2
+
+g_valor_ref2_q <- ggplot(valores_ref2, aes(sample = diff)) +
+  geom_qq(distribution = stats::qnorm) +
+  geom_hline(yintercept = mean_org, color = "red") 
+ 
+
+g_valor_ref2_hist <- ggplot(valores_ref2, aes(y = diff)) +
+  geom_histogram() +
+  geom_hline(yintercept = mean_org, color = "red") 
+g_valor_ref2_q +  g_valor_ref2_hist
+
 ```
 
 ## Bootstrap
@@ -238,6 +289,56 @@ muestra_tidy <- muestra |>
   group_by(ESTRATO) |> 
   mutate(n = n()) |> 
   ungroup()
+
+
+## add number of casillas at computo
+computos_tidy <- computos %>% 
+  group_by(ESTRATO) %>% mutate(N = n())
+glimpse(computos)
+
+```
+
+##### Calculating$$\hat{p}
+
+```{r}
+## calculo de los parametros de p_hat
+
+estimador_p_estr <- function(sample_elect, total_elect, next_strata ){
+  # find all correspinding estratos in sample and total
+  corr_total_idx <- which(total_elect$ESTRATO == next_strata)
+  corr_sample_idx <- which(sample_elect$ESTRATO == next_strata)
+  # número total de casillas en el $h$-ésimo estrato.
+  N <- sum(total_elect$N[corr_total_idx])
+  #número de casillas del $h$-ésimo estrato que se seleccionaron en la muestra.
+  n <- sum(sample_elect$n[corr_sample_idx])
+  #número total de votos que recibió la opción SI en la $i$-ésima casillas, que pertence al $h$-ésimo estrato.
+  Y_si_sum <- sum(sample_elect$SI[corr_sample_idx])
+  #número total de votos que recibió la opción NO en la $i$-ésima casillas, que pertence al $h$-ésimo estrato.
+  Y_no_sum <- sum(sample_elect$NO[corr_sample_idx])
+    #número total de votos que recibió la opción NOLOS en la $i$-ésima casillas, que pertence al $h$-ésimo estrato.
+  Y_nu_sum <- sum(sample_elect$NULOS[corr_sample_idx])
+  # número total de votos en la $i$-ésima casilla, que pertence al $h$-ésimo estrato.
+  X_total_sum <- sum(sample_elect$TOTAL[corr_sample_idx])
+  # calculating nominators of p for SI, NO and NULOS  
+  nom_p_si <- (N/n) * Y_si_sum
+  nom_p_no <- (N/n) * Y_no_sum
+  nom_p_nu <- (N/n) * Y_nu_sum
+  # calculating denominator of p  
+  den_p <- (N/n) * X_total_sum 
+  p_si_estr = nom_p_si/den_p
+  p_no_estr = nom_p_no/den_p
+  p_nu_estr = nom_p_nu/den_p
+  results_p_estr <- tibble(p_si_estr, p_no_estr, p_nu_estr, check = p_si_estr+p_no_estr+p_nu_estr)
+    
+     return(results_p_estr)
+    printf("next ")
+}
+
+next_str_idx <- 0
+num_of_sample <- nrow(muestra_tidy)
+next_strata = muestra_tidy$ESTRATO[1]
+#while(next_str_idx <= num_of_sample)
+  
 ```
 
 2.  Utiliza **bootstrap** para calcular el error estándar, y reporta tu
@@ -263,7 +364,7 @@ muestra_tidy <- muestra |>
 Selecciona al menos 50 muestras del mismo tamaño y con el mismo diseño
 que la muestra utilizada en el conteo rápido. Esto es, selecciona el
 mismo número de casillas, usando muestreo aleatorio simple dentro de
-cada estrato.
+cada estrato. **(hacer muestra de computo con la misma longitud)**
 
 -   Para cada muestra calcula un intervalo del 95% de confianza usando
     bootstrap.
@@ -283,6 +384,7 @@ ver para la proporción de votos nulos en una casilla.
 -   Describe la distribución de datos nulos en la muestra, y como se
     relaciona con el total de votos, realiza gráficas y describe tus
     observaciones.
+
 ```{r}
 votos_total <- sum(computos$TOTAL_OPINIONES)
 votos_nulos_total <- sum(computos$NULOS)
@@ -314,7 +416,6 @@ hist_g <- ggplot(muestra, aes(x = NULOS)) +
 
 hist_g
 ```
-
 
 -   En la distribución de proporción de nulos se observan datos
     atípicos, ¿cuál crees que sea la razón de estas observaciones
