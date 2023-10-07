@@ -159,10 +159,10 @@ Explicación:
 
 ```{r}
 zapatos_tbl <- zapatos %>% group_by(niño) %>% 
-  pivot_wider(names_from = niño, values_from = desgaste) %>% 
-  bind_rows(diff = zapatos_tbl[1,] - zapatos_tbl[2,])
+  pivot_wider(names_from = niño, values_from = desgaste) 
 
-zapatos_tbl
+zapatos_tbl %>% 
+  bind_rows(diff = zapatos_tbl[1,] - zapatos_tbl[2,])
 #diff_material_per_child <- zapatos_tbl[3,2:11]
 # se tomo los valores de la diferencia de desgaste de por niños via "copy and paste" para hacer el nuevo dada frame y analizarlo (dmpc = difference of material per child).
 dmpc_tbl <- tibble(dmpc = c(-0.800, -0.600, -0.300,  0.100, -1.10, 0.200, -0.300,  -0.5,  -0.5, -0.300))
@@ -325,20 +325,40 @@ estimador_p_estr <- function(sample_elect, total_elect, next_strata ){
   nom_p_nu <- (N/n) * Y_nu_sum
   # calculating denominator of p  
   den_p <- (N/n) * X_total_sum 
-  p_si_estr = nom_p_si/den_p
-  p_no_estr = nom_p_no/den_p
-  p_nu_estr = nom_p_nu/den_p
-  results_p_estr <- tibble(p_si_estr, p_no_estr, p_nu_estr, check = p_si_estr+p_no_estr+p_nu_estr)
-    
-     return(results_p_estr)
-    printf("next ")
+  results_p_estr <- tibble( nom_p_si,  nom_p_no,  nom_p_nu, den_p )
+  return(results_p_estr)
 }
 
-next_str_idx <- 0
+next_str_idx <- 1
+p_si_nom_total <- 0
+p_no_nom_total <- 0
+p_nu_nom_total <- 0
+p_den_total <- 0
 num_of_sample <- nrow(muestra_tidy)
-next_strata = muestra_tidy$ESTRATO[1]
-#while(next_str_idx <= num_of_sample)
+while(next_str_idx <= num_of_sample){
+  # find next estarto
+  next_strata <- muestra_tidy$ESTRATO[next_str_idx]
+  # sum all nominator values for SI, NO, NULOS of p_hat
+  p_estr <- estimador_p_estr(muestra_tidy, computos_tidy, next_strata) 
+  p_si_nom_total = p_estr$nom_p_si + p_si_nom_total
+  p_no_nom_total = p_estr$nom_p_no + p_no_nom_total
+  p_nu_nom_total = p_estr$nom_p_nu + p_nu_nom_total
+  # sum denominator of p_hat
+  p_den_total = p_estr$den_p+ p_den_total
   
+  # define the next estrato ID
+  idx_estr <- which(muestra_tidy$ESTRATO == next_strata)
+  next_str_idx <- next_str_idx + length(idx_estr)
+}
+results <- tibble(p_hat_si = p_si_nom_total/p_den_total,
+    p_hat_no = p_no_nom_total/p_den_total,
+    p_hat_nu = p_nu_nom_total/p_den_total,
+    check = p_hat_si +p_hat_no + p_hat_nu
+)
+results
+```
+
+```{}
 ```
 
 2.  Utiliza **bootstrap** para calcular el error estándar, y reporta tu
