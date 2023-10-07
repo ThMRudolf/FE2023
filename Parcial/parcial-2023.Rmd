@@ -298,7 +298,7 @@ glimpse(computos)
 
 ```
 
-##### Calculating$$\hat{p}
+##### Calculating\$\$\hat{p}
 
 ```{r}
 ## calculo de los parametros de p_hat
@@ -350,15 +350,12 @@ while(next_str_idx <= num_of_sample){
   idx_estr <- which(muestra_tidy$ESTRATO == next_strata)
   next_str_idx <- next_str_idx + length(idx_estr)
 }
-results <- tibble(p_hat_si = p_si_nom_total/p_den_total,
-    p_hat_no = p_no_nom_total/p_den_total,
-    p_hat_nu = p_nu_nom_total/p_den_total,
-    check = p_hat_si +p_hat_no + p_hat_nu
+results <- tibble(p_hat_si = p_si_nom_total/p_den_total, # probabilidad estimada que SI
+    p_hat_no = p_no_nom_total/p_den_total, # probabilidad estimada que NO
+    p_hat_nu = p_nu_nom_total/p_den_total, # probabilidad estimada que NULOS
+    check = p_hat_si +p_hat_no + p_hat_nu # check, suma de los tres p_hat anteriores. tienen que ser 1
 )
 results
-```
-
-```{}
 ```
 
 2.  Utiliza **bootstrap** para calcular el error estándar, y reporta tu
