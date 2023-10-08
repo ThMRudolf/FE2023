@@ -303,70 +303,32 @@ glimpse(computos)
 ```{r}
 ## calculo de los parametros de p_hat
 
-estimador_p_estr <- function(sample_elect, total_elect, next_strata ){
-  # find all correspinding estratos in sample and total
-  corr_total_idx <- which(total_elect$ESTRATO == next_strata)
-  corr_sample_idx <- which(sample_elect$ESTRATO == next_strata)
-  # número total de casillas en el $h$-ésimo estrato.
-  N <- sum(total_elect$N[corr_total_idx])
-  #número de casillas del $h$-ésimo estrato que se seleccionaron en la muestra.
-  n <- sum(sample_elect$n[corr_sample_idx])
-  #número total de votos que recibió la opción SI en la $i$-ésima casillas, que pertence al $h$-ésimo estrato.
-  Y_si_sum <- sum(sample_elect$SI[corr_sample_idx])
-  #número total de votos que recibió la opción NO en la $i$-ésima casillas, que pertence al $h$-ésimo estrato.
-  Y_no_sum <- sum(sample_elect$NO[corr_sample_idx])
-    #número total de votos que recibió la opción NOLOS en la $i$-ésima casillas, que pertence al $h$-ésimo estrato.
-  Y_nu_sum <- sum(sample_elect$NULOS[corr_sample_idx])
-  # número total de votos en la $i$-ésima casilla, que pertence al $h$-ésimo estrato.
-  X_total_sum <- sum(sample_elect$TOTAL[corr_sample_idx])
-  # calculating nominators of p for SI, NO and NULOS  
-  nom_p_si <- (N/n) * Y_si_sum
-  nom_p_no <- (N/n) * Y_no_sum
-  nom_p_nu <- (N/n) * Y_nu_sum
-  # calculating denominator of p  
-  den_p <- (N/n) * X_total_sum 
-  results_p_estr <- c( nom_p_si,  nom_p_no,  nom_p_nu, den_p )
-  return(results_p_estr)
-}
-
-perc_calc <- function(sample_elect, total_elect, strata_array){
-  # inizialize
-  p_si_nom_total <- 0
-  p_no_nom_total <- 0
-  p_nu_nom_total <- 0
-  p_den_total <- 0
-  n_strata <- length(strata_array)
-  p_estr <- map(1:n_strata, ~estimador_p_estr(sample_elect, total_elect , strata_array[.x])) 
-  for (idx in 1:n_strata){
-    # sum all nominator values for SI, NO, NULOS of p_hat
-    p_si_nom_total = p_estr[[idx]][1] + p_si_nom_total
-    p_no_nom_total = p_estr[[idx]][2] + p_no_nom_total
-    p_nu_nom_total = p_estr[[idx]][3] + p_nu_nom_total
-    # sum denominator of p_hat
-    p_den_total = p_estr[[idx]][4] + p_den_total
-  }
+estimador_p <- function(sample2eval, pop_total){
   
-  results <- tibble(p_hat_si = p_si_nom_total/p_den_total, # probabilidad estimada que SI
-   p_hat_no = p_no_nom_total/p_den_total, # probabilidad estimada que NO
-   p_hat_nu = p_nu_nom_total/p_den_total, # probabilidad estimada que NULOS
-   check = p_hat_si +p_hat_no + p_hat_nu) # check, suma de los tres p_hat anteriores. tienen que ser 1
-  return(results)
-  }
+  Y_hi <- sample2eval %>% 
+    group_by(ESTRATO, ID_CASILLA) %>% 
+    summarise(votos_si = sum(SI), votos_no = sum(NO),votos_nu = sum(NULOS))
 
-next_str_idx <- 1
-num_of_sample <- nrow(muestra_tidy)
-strata_array <- character() # might be usefull for later evaluations
-while(next_str_idx <= num_of_sample){
-  # find next estarto
-  next_strata <- muestra_tidy$ESTRATO[next_str_idx]
-  strata_array <- c(strata_array, next_strata)
-  # define the next estrato ID
-  idx_estr <- which(muestra_tidy$ESTRATO == next_strata)
-  next_str_idx <- next_str_idx + length(idx_estr)
+  X_hi <- sample2eval %>% 
+    group_by(ESTRATO, ID_CASILLA) %>% 
+    summarise(votos_TOTAL = sum(TOTAL))
+
+  N <- pop_total %>%  
+    group_by(ESTRATO) %>% 
+    summarise(N = sum(N))
+  n <- sample2eval %>% 
+    group_by(ESTRATO) %>% 
+    summarise(n = sum(n))
+
+  den_tot <- sum(N$N/n$n *sum(X_hi$votos_TOTAL))
+  p_hat_si <- sum(N$N/n$n *sum(Y_hi$votos_si))/(den_tot)
+  p_hat_no <- sum(N$N/n$n *sum(Y_hi$votos_no))/(den_tot)
+  p_hat_nu <- sum(N$N/n$n *sum(Y_hi$votos_nu))/(den_tot)
+  perc_sample <- tibble(p_hat_si, p_hat_no, p_hat_nu, 
+                        check = p_hat_si + p_hat_no + p_hat_nu)
 }
-
-results_single<- perc_calc(muestra_tidy, computos_tidy, strata_array)
-
+est_muestra <- estimador_p(muestra_tidy, computos_tidy)
+est_muestra
 ```
 
 2.  Utiliza **bootstrap** para calcular el error estándar, y reporta tu
@@ -379,29 +341,24 @@ results_single<- perc_calc(muestra_tidy, computos_tidy, strata_array)
         tomar muestra aleatoria independiente dentro de cada estrato.
 ```{r}
 set.seed(1234)
-get_boot <- function(sample2boot, strata_id){
-  #
-  bb_next <- numeric(0)
-  bb_samples <- data.frame()
-  #
-  bb_next <- which(sample2boot$ESTRATO == strata_id)
-  selected_values <- select(sample2boot[bb_next, ], SI, NO, NULOS, TOTAL)
-  bb_samples <- slice_sample(selected_values, prop = 1, replace = TRUE)
-  print(bb_samples)
-  sample2boot[bb_next, ]$SI = bb_samples$SI
-  sample2boot[bb_next, ]$NO = bb_samples$NO
-  sample2boot[bb_next, ]$NULOS = bb_samples$NULOS
-  sample2boot[bb_next, ]$TOTAL = bb_samples$TOTAL
-  #
-  return(sample2boot)
-  
+get_sample <- function(sample2eval){
+  resample <- slice_sample(sample2eval %>% group_by(ESTRATO), prop = 1, replace = TRUE)
 }
-n_strata = length(strata_array) #
-bootstrat_sample <- map(1:n_strata, ~ get_boot(muestra_tidy, strata_array[.x]) )
-bootstrat_sample
+boot_sample <- map(1:1000,~ estimador_p(get_sample(muestra_tidy), computos_tidy))
+p_hat_si_vec <- c(boot_sample[[1]]$p_hat_si)  
+p_hat_no_vec <- c(boot_sample[[1]]$p_hat_no)  
+p_hat_nu_vec <- c(boot_sample[[1]]$p_hat_nu)  
 
-
-results_boot<- map(1:n_strata, ~ perc_calc(bootstrat_sample[[.x]], computos_tidy, strata_array))
+for(idx in 2:1000){
+  p_hat_si_vec <- c(p_hat_si_vec, boot_sample[[idx]]$p_hat_si)  
+  p_hat_no_vec <- c(p_hat_no_vec, boot_sample[[idx]]$p_hat_no)  
+  p_hat_nu_vec <- c(p_hat_nu_vec, boot_sample[[idx]]$p_hat_nu)  
+}
+ee_p_hat_si <- sd(p_hat_si_vec)
+ee_p_hat_no <- sd(p_hat_no_vec)
+ee_p_hat_nu <- sd(p_hat_nu_vec)
+ee_res_boot <- tibble(ee_p_hat_si, ee_p_hat_no, ee_p_hat_nu)
+ee_res_boot
 
 ```
 
