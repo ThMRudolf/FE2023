@@ -325,37 +325,48 @@ estimador_p_estr <- function(sample_elect, total_elect, next_strata ){
   nom_p_nu <- (N/n) * Y_nu_sum
   # calculating denominator of p  
   den_p <- (N/n) * X_total_sum 
-  results_p_estr <- tibble( nom_p_si,  nom_p_no,  nom_p_nu, den_p )
+  results_p_estr <- c( nom_p_si,  nom_p_no,  nom_p_nu, den_p )
   return(results_p_estr)
 }
 
+perc_calc <- function(sample_elect, total_elect, strata_array){
+  # inizialize
+  p_si_nom_total <- 0
+  p_no_nom_total <- 0
+  p_nu_nom_total <- 0
+  p_den_total <- 0
+  n_strata <- length(strata_array)
+  p_estr <- map(1:n_strata, ~estimador_p_estr(sample_elect, total_elect , strata_array[.x])) 
+  for (idx in 1:n_strata){
+    # sum all nominator values for SI, NO, NULOS of p_hat
+    p_si_nom_total = p_estr[[idx]][1] + p_si_nom_total
+    p_no_nom_total = p_estr[[idx]][2] + p_no_nom_total
+    p_nu_nom_total = p_estr[[idx]][3] + p_nu_nom_total
+    # sum denominator of p_hat
+    p_den_total = p_estr[[idx]][4] + p_den_total
+  }
+  
+  results <- tibble(p_hat_si = p_si_nom_total/p_den_total, # probabilidad estimada que SI
+   p_hat_no = p_no_nom_total/p_den_total, # probabilidad estimada que NO
+   p_hat_nu = p_nu_nom_total/p_den_total, # probabilidad estimada que NULOS
+   check = p_hat_si +p_hat_no + p_hat_nu) # check, suma de los tres p_hat anteriores. tienen que ser 1
+  return(results)
+  }
+
 next_str_idx <- 1
-p_si_nom_total <- 0
-p_no_nom_total <- 0
-p_nu_nom_total <- 0
-p_den_total <- 0
 num_of_sample <- nrow(muestra_tidy)
+strata_array <- character() # might be usefull for later evaluations
 while(next_str_idx <= num_of_sample){
   # find next estarto
   next_strata <- muestra_tidy$ESTRATO[next_str_idx]
-  # sum all nominator values for SI, NO, NULOS of p_hat
-  p_estr <- estimador_p_estr(muestra_tidy, computos_tidy, next_strata) 
-  p_si_nom_total = p_estr$nom_p_si + p_si_nom_total
-  p_no_nom_total = p_estr$nom_p_no + p_no_nom_total
-  p_nu_nom_total = p_estr$nom_p_nu + p_nu_nom_total
-  # sum denominator of p_hat
-  p_den_total = p_estr$den_p+ p_den_total
-  
+  strata_array <- c(strata_array, next_strata)
   # define the next estrato ID
   idx_estr <- which(muestra_tidy$ESTRATO == next_strata)
   next_str_idx <- next_str_idx + length(idx_estr)
 }
-results <- tibble(p_hat_si = p_si_nom_total/p_den_total, # probabilidad estimada que SI
-    p_hat_no = p_no_nom_total/p_den_total, # probabilidad estimada que NO
-    p_hat_nu = p_nu_nom_total/p_den_total, # probabilidad estimada que NULOS
-    check = p_hat_si +p_hat_no + p_hat_nu # check, suma de los tres p_hat anteriores. tienen que ser 1
-)
-results
+
+results_single<- perc_calc(muestra_tidy, computos_tidy, strata_array)
+
 ```
 
 2.  Utiliza **bootstrap** para calcular el error estándar, y reporta tu
@@ -366,6 +377,22 @@ results
         la metodología que se utilizó en la selección de la muestra
         original, en este caso implica que para cada remuestra debes
         tomar muestra aleatoria independiente dentro de cada estrato.
+```{r}
+set.seed(1234)
+get_boot <- function(sample2boot, strata_id){
+  bb_next <- which(sample2boot$ESTRATO == strata_id)
+  bb_samples <- slice_sample(muestra_tidy[bb_next, ], n = 1745, replace = TRUE) 
+  
+  #p_boot <- perc_calc(bb_samples, computos_tidy,bb_next )
+  #results_boot <- c(p_boot$p_hat_si,  p_boot$p_hat_no,  p_boot$np_hat_nu, p_boot$check)
+}
+n_strata = length(strata_array)
+bootstrat_sample <- map(1:n_strata, ~ get_boot(muestra_tidy, strata_array[.x]) )
+bootstrat_sample
+
+
+results_boot<- map(1:2, ~ perc_calc(bootstrat_sample[[.x]], computos_tidy, strata_array))
+```
 
 3.  Construye un intervalo del 95% de confianza utilizando el método
     normal. Revisa si el supuesto de normalidad es razonable.
