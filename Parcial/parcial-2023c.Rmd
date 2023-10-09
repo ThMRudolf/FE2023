@@ -265,6 +265,11 @@ computos <- computos |>
          LISTA_NOMINAL = LISTA_NOMINAL_MRCP, 
          TOTAL = TOTAL_OPINIONES)
 
+computos_tidy <- computos |> group_by(ESTRATO) |> 
+  mutate(N = n()) |> 
+  ungroup()
+
+
 muestra <- read_delim("https://ine.mx/wp-content/uploads/2021/08/Conteos-ConsPop21-Lista-MuestraCalculo.txt", delim = "|", skip = 1) 
 muestra_tidy <- muestra |> 
   mutate(
@@ -464,7 +469,7 @@ g_nu <- ggplot(p_hat_tbl, aes(p_hat_nu)) +
   geom_histogram() +
   geom_vline(xintercept = mean(p_hat_tbl$p_hat_nu), colour = "red")
 
-g_si + g_no + g_nu
+#g_si + g_no + g_nu
 ```
 
 3. Construye un intervalo del 95% de confianza utilizando el método normal. Revisa 
@@ -527,7 +532,16 @@ tabla_intervalos
 resultados observados.
 
 ```{r}
-val_de_todo <-esti_all(computos, computos) 
+p_si_total <- sum(computos$OPINION_SI)/sum(computos$TOTAL)
+print("¿el valor final de SI está dentro del intervalo estimado?")
+(p_si_total>interv_p_hat_si_95[1] & p_si_total<interv_p_hat_si_95[2])
+p_no_total <- sum(computos$OPINION_NO)/sum(computos$TOTAL)
+print("¿el valor final de NO está dentro del intervalo estimado?")
+(p_no_total>interv_p_hat_no_95[1] & p_no_total<interv_p_hat_no_95[2])
+p_nu_total <- sum(computos$NULOS)/sum(computos$TOTAL)
+print("¿el valor final de NULO está dentro del intervalo estimado?")
+(p_nu_total>interv_p_hat_nu_95[1] & p_nu_total<interv_p_hat_nu_95[2])
+
 ```
 
 
@@ -538,33 +552,135 @@ muestra utilizada en el conteo rápido. Esto es, selecciona el
 mismo número de casillas, usando muestreo aleatorio simple dentro de cada estrato.
 
 ```{r}
-set.seed(389)
-# define el estimador
-calc_estimador <- function(data){
-  p_hat <- data %>% 
-    summarise(p_hat_si_mean = mean(data$p_hat_si), 
-              p_hat_no_mean = mean(data$p_hat_no),
-              p_hat_nu_mean = mean(data$p_hat_nu), 
-              n = length(data$p_hat_si), .groups = "drop") #%>% 
-    #pull(p_hat)
-  p_hat
-}
-# define el proceso de remuestra
-muestra_boot <- function(data){
-  slice_sample(data, prop = 1, replace = TRUE)
-}
+# seleción de 50 muestras
+muestra_new <- computos_tidy %>% slice_sample(n=1745, replace = TRUE) 
 
-
- <- tibble(total_boot = map(1:100, ~ calc_estimador(muestra_boot(p_hat_tbl))))
 
 ```
 
 
 * Para cada muestra calcula un intervalo del 95% de confianza usando bootstrap.
 
+```{r}
+# este estimador hace lo mismo que estimador_p(), la diferencia es el tio de sample2eval, es la muestra de computos_tidy, se ajustaron algunas variable: ID en lugar de ID_CASILLA, OPINION_NO en lugar de NO y OPINION_SI en lugar de SI
+estimador_p_comp <- function(sample2eval, pop_total){
+  
+  Y_hi <- sample2eval %>% 
+    group_by(ESTRATO, ID) %>% 
+    summarise(votos_si = sum(OPINION_SI), votos_no = sum(OPINION_NO),votos_nu = sum(NULOS))
+
+  X_hi <- sample2eval %>% 
+    group_by(ESTRATO, ID) %>% 
+    summarise(votos_TOTAL = sum(TOTAL))
+
+  N <- pop_total %>%  
+    group_by(ESTRATO) %>% 
+    summarise(N = sum(N))
+  n <- sample2eval %>% 
+    group_by(ESTRATO) %>% 
+    summarise(n = sum(N))
+
+  den_tot <- sum(N$N/n$n *sum(X_hi$votos_TOTAL))
+  p_hat_si <- sum(N$N/n$n *sum(Y_hi$votos_si))/(den_tot)
+  p_hat_no <- sum(N$N/n$n *sum(Y_hi$votos_no))/(den_tot)
+  p_hat_nu <- sum(N$N/n$n *sum(Y_hi$votos_nu))/(den_tot)
+  perc_sample <- tibble(p_hat_si, p_hat_no, p_hat_nu, 
+                        check = p_hat_si + p_hat_no + p_hat_nu)
+}
+
+#est_muestra_new <- estimador_p_comp(muestra_new, computos_tidy)
+
+set.seed(389)
+sim_interval <- function(rep, size = 1745, id = "si"){
+  muestra_cr <- slice_sample(computos_tidy, n=size)
+  total_est_tbl <- estimador_p_comp (muestra_cr, computos_tidy)
+  if(id == "si"){
+    total_est <- total_est_tbl$p_hat_si
+  }
+  if(id == "no"){
+    total_est <- total_est_tbl$p_hat_no
+  }
+  if(id == "nu"){
+    total_est <- total_est_tbl$p_hat_nu
+  }
+  # define el estimador
+  calc_estimador <- function(data){
+    p_hat<-estimador_p_comp(data, computos_tidy)
+    if(id == "si"){
+      p_hat_out <- p_hat$p_hat_si
+    }
+    if(id == "no"){
+      p_hat_out <- p_hat$p_hat_no
+    }
+    if(id == "nu"){
+      p_hat_out <- p_hat$p_hat_nu
+    }
+    class(p_hat_out)
+    p_hat_out
+  }
+  # define el proceso de remuestra
+  muestra_boot <- function(data){
+    slice_sample(data, prop = 1, replace = TRUE)
+  }
+
+ totales_boot <-  map_dbl(1:1000, ~ calc_estimador(muestra_boot(muestra_cr))) %>% 
+    tibble(total_boot = .) %>% 
+    summarise(ee_boot = sd(total_boot)) %>% 
+    mutate(inf = total_est - 2*ee_boot, sup = total_est + 2*ee_boot) %>% 
+    mutate(rep = rep)
+  totales_boot
+}
+#sim_intervalo_si <- map(1:50, ~sim_interval(.x, size = 1745, id = "si"))
+#write_rds(sim_intervalo_si, "cache/sim_intervalo_si.rds")
+
+sim_intervalo_si <- read_rds("cache/sim_intervalo_si.rds")
+#sim_intervalo_nu <- map(1:50, ~sim_interval(.x, size = 1745, id = "nu"))
+#write_rds(sim_intervalo_nu, "cache/sim_intervalo_nu.rds")
+sim_intervalo_no <- read_rds("cache/sim_intervalo_no.rds")
+#sim_intervalo_no <- map(1:50, ~sim_interval(.x, size = 1745, id = "no"))
+#write_rds(sim_intervalo_no, "cache/sim_intervalo_no.rds")
+sim_intervalo_nu <- read_rds("cache/sim_intervalo_nu.rds")
+
+```
+
+
 * Grafica los intervalos y calcula la proporción de ellos que contienen el 
 verdadero valor observado. Describe tus observaciones y compara con el intervalo 
 obtenido en el ejercicio anterior.
+
+```{r}
+# graficas para calibaracion SI
+P_expected <- p_si_total
+sim_intervalo_si_tbl <- sim_intervalo_si |> 
+    bind_rows() |>
+            mutate(cubre = inf < P_expected & P_expected < sup) 
+intervalo_si_plot <-  ggplot(sim_intervalo_si_tbl, aes(x = rep)) +
+      geom_hline(yintercept = P_expected, colour = "red") +
+      geom_linerange(aes(ymin = inf, ymax = sup, colour = cubre)) +
+  labs(title = "calibaración SI") +
+  ylab("invervalls")
+
+# graficas para calibaración NO    
+P_expected <- p_no_total
+sim_intervalo_no_tbl <- sim_intervalo_no |> 
+    bind_rows() |>
+            mutate(cubre = inf < P_expected & P_expected < sup) 
+intervalo_no_plot <-  ggplot(sim_intervalo_no_tbl, aes(x = rep)) +
+      geom_hline(yintercept = P_expected, colour = "red") +
+      geom_linerange(aes(ymin = inf, ymax = sup, colour = cubre)) +
+  labs(title = "calibaración NO")
+ 
+# graficas para calibaración NULOS   
+P_expected <- p_nu_total
+sim_intervalo_no_tbl <- sim_intervalo_no |> 
+    bind_rows() |>
+            mutate(cubre = inf < P_expected & P_expected < sup) 
+intervalo_nu_plot <-  ggplot(sim_intervalo_nu_tbl, aes(x = rep)) +
+      geom_hline(yintercept = P_expected, colour = "red") +
+      geom_linerange(aes(ymin = inf, ymax = sup, colour = cubre)) 
+
+intervalo_si_plot + intervalo_no_plot +intervalo_nu_plot
+```
 
 
 #### Análisis Exploratorio
