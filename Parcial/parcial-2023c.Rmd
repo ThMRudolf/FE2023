@@ -476,11 +476,23 @@ g_nu <- ggplot(p_hat_tbl, aes(p_hat_nu)) +
 
 #g_si + g_no + g_nu
 ```
+**Explicación**
+Los errores de estandard parcen en un rango racionalble, son relatiavamente pequeña.
 
 3. Construye un intervalo del 95% de confianza utilizando el método normal. Revisa 
 si el supuesto de normalidad es razonable.
 
 ```{r}
+# graficas histogramas de SI, NO, NULOS
+g_si <- ggplot(p_hat_tbl, aes(p_hat_si)) + 
+  geom_histogram() +
+  geom_vline(xintercept = mean(p_hat_tbl$p_hat_si), colour = "red")
+g_no <- ggplot(p_hat_tbl, aes(p_hat_no)) + 
+  geom_histogram() +
+  geom_vline(xintercept = mean(p_hat_tbl$p_hat_no), colour = "red")
+g_nu <- ggplot(p_hat_tbl, aes(p_hat_nu)) + 
+  geom_histogram() +
+  geom_vline(xintercept = mean(p_hat_tbl$p_hat_nu), colour = "red")
 # intervalos de confianza p_hat_si
 interv_p_hat_si_95 <- c(percentage_p_si - 2*ee_p_hat_si, percentage_p_si + 2*ee_p_hat_si)
 interv_p_hat_si_95
@@ -515,7 +527,15 @@ g_nu + g_nu_qq
 
 ```
 **Explicación**:
+Las graficas para determinar si la distriución bootstrap de los votos son normales indican que si.
 
+*voto SI:* Lo cola izq. de la dsitribución SI es un poco mas larga que la normal mientras la cola derecha es un poco mas corta.
+
+*voto NO:* Lo cola izq. de la dsitribución NO es un poco mas larga (menos de la SI) que la normal mientras la cola derecha es un poco mas larga. sin embargo casi no se nota en el histograma.
+
+*voto NULOS:*o cola izq. de la dsitribución NULOS es un poco mas larga (menos de la SI) que la normal mientras la cola derecha es un poco mas corta. sin embargo casi no se nota en el histograma.
+
+*Resumen:* Observamos que las tres distrubciones pueden ser considerados norma dentro de un interalo de 95% (lineas verdes)
 
 4. Reporta tus intervalos en una tabla. Compara la longitud de los 3 intervalos y 
 describe que observas.
