@@ -121,6 +121,8 @@ disp_perm <- ecdf(valores_ref$diff)
 2 * min(disp_perm(diff_material$diff_mat), (1-disp_perm(diff_material$diff_mat)))
 ```
 **Explicación**:
+**Aunque se ve una diferencia en el desgaste del material A en comparación del matarial B se puede pensar que hay una diferencia. En base de los resultados se comprueba la hypothesis H0, no hay evidencias que el material B tiene un degsate diferente.**
+
 
 3. Después de discutir con los responsables del proyecto descubrimos que nos 
 faltaba conocer detalles del proceso generador de datos: el experimento se realizó asignando al azar un material a uno de sus zapatos y el otro material al otro zapato de cada niño.
@@ -146,7 +148,9 @@ g_desgaste_por_nino
 
 ```
 
-**Explicacicón**:
+***Explicacicón***:
+**En base de la analisis tomando en cuenta el usuario (niños) se nota que la diferencia notado anterioremente no está basada en el material (A=1, B=2) si ni e lo usuarios. Comparando el desgaste de los dos materiales, se ve que cada niño desgaste aprox de la misma manera los zapatos. La diferencia en los desgaste están mas bien un resultado del usuario.**
+
 
 ```{r}
 zapatos_tbl <- zapatos %>% group_by(niño) %>% 
@@ -188,7 +192,8 @@ g_valor_ref2_hist <- ggplot(valores_ref2, aes(y = diff)) +
 g_valor_ref2_q +  g_valor_ref2_hist
 ```
 
-
+***Explicación***
+**Estas graficas confirman que no hay evidencias para rechazar la hipotesis nula (H0)**
 
 ## Bootstrap
 
@@ -668,18 +673,26 @@ sim_intervalo_no_tbl <- sim_intervalo_no |>
 intervalo_no_plot <-  ggplot(sim_intervalo_no_tbl, aes(x = rep)) +
       geom_hline(yintercept = P_expected, colour = "red") +
       geom_linerange(aes(ymin = inf, ymax = sup, colour = cubre)) +
-  labs(title = "calibaración NO")
+  labs(title = "calibaración NO") +
+  labs(title = "calibaración NO") +
+  ylab("invervalls")
+
  
 # graficas para calibaración NULOS   
 P_expected <- p_nu_total
-sim_intervalo_no_tbl <- sim_intervalo_no |> 
+sim_intervalo_nu_tbl <- sim_intervalo_nu |> 
     bind_rows() |>
             mutate(cubre = inf < P_expected & P_expected < sup) 
 intervalo_nu_plot <-  ggplot(sim_intervalo_nu_tbl, aes(x = rep)) +
-      geom_hline(yintercept = P_expected, colour = "red") +
-      geom_linerange(aes(ymin = inf, ymax = sup, colour = cubre)) 
+  geom_hline(yintercept = P_expected, colour = "red") +
+  geom_linerange(aes(ymin = inf, ymax = sup, colour = cubre))+
+  labs(title = "calibaración NULOS") +
+  ylab("invervalls")
 
-intervalo_si_plot + intervalo_no_plot +intervalo_nu_plot
+
+intervalo_si_plot 
+intervalo_no_plot 
+intervalo_nu_plot
 ```
 
 
@@ -697,5 +710,38 @@ el total de votos, realiza gráficas y describe tus observaciones.
 * En la distribución de proporción de nulos se observan datos atípicos, ¿cuál 
 crees que sea la razón de estas observaciones extremas? ¿consideras que se
 deben eliminar de la muestra antes de realizar la estimación?
+
+```{r}
+votos_total <- sum(computos$TOTAL_OPINIONES)
+votos_nulos_total <- sum(computos$NULOS)
+votos_total_muestra <- sum(muestra$TOTAL)
+votos_nulos_muestra <- sum(muestra$NULOS)
+
+perc_nulos_total <- votos_nulos_total/votos_total
+perc_nulos_total
+perc_nulos_muestra <- votos_nulos_muestra/votos_total_muestra
+perc_nulos_muestra
+
+library(ggrepel)
+ae_g_map <- ggplot(muestra, aes(x = ID_ESTADO, y = NULOS , label =  ESTRATO )) +
+  geom_point(color="red", size = 2) +
+  geom_text_repel(colour = "gray50")
+ae_g_map
+
+norm_muestra_g <- ggplot(muestra, aes(sample=NULOS)) +
+  geom_qq(distribution = stats::qnorm) +
+  geom_qq_line(color = "red")
+norm_muestra_g
+
+norm_total_g <- ggplot(computos, aes(sample=NULOS)) +
+  geom_qq(distribution = stats::qnorm) +
+  geom_qq_line(color = "red")
+norm_total_g
+hist_g <- ggplot(muestra, aes(x = NULOS)) + 
+  geom_histogram()
+
+hist_g
+
+```
 
 
