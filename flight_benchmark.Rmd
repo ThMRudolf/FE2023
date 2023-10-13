@@ -1,0 +1,114 @@
+---
+title: "flight_analysis"
+output: html_document
+date: "2023-10-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Flight Analysis
+# importing necessary libraries
+```{r flights}
+library(nycflights13)
+library(dplyr)
+library(tidyverse)
+library(patchwork)
+```
+
+We have to answer the following questions:
+
+¿Cuàl es la Aerolíneas con más retrasadas?
+¿Cuál es la distribuciones del retraso?
+¿Cuál es el avión más retrasado?
+¿Cuál es el avión que más recorrió, el top 10 distancia, viajes?
+¿Los vuelos están vinculados a la ruta?
+¿Cuál es frecuencia de retrasos por hora?
+¿Hay diferencia por aeropuerto en retrasos?
+¿Hay diferencia por mes en retrasos?
+¿Cuál es el peor vuelo?
+¿Cuál es el peor día de la semana para volar?
+
+```{r ,fli echo=FALSE}
+# para ver las variables y la estrcutura de "flights"
+glimpse(flights)
+```
+**¿Cuàl es la Aerolíneas con más retrasadas?**
+```{r}
+ # define NA en "delays" con valor 0
+idx_dep_delay <- which(is.na(flights$dep_delay))
+flights$dep_delay[idx_dep_delay] <- 0
+idx_arr_delay <- which(is.na(flights$arr_delay))
+flights$arr_delay[idx_arr_delay] <- 0
+# group by Airline and calculated the max delay
+max_delay_per_airline <-
+  flights %>% group_by(carrier) %>% 
+    summarise(max_dep_delays = sum(dep_delay), 
+              max_arr_delays = sum(arr_delay)) 
+
+## aqui me gustaria saber como hacer los 
+max_delay_per_airline
+airline_max_dep_delay <- max(max_delay_per_airline$max_dep_delays)
+idx_carrier_dep <- which(airline_max_dep_delay == max_delay_per_airline$max_dep_delays )
+print("Aerolinea con mayor retrasos de los salidas:")
+airline_max_arr_delay <- max(max_delay_per_airline$max_arr_delays)
+idx_carrier_arr <- which(airline_max_arr_delay == max_delay_per_airline$max_arr_delays )
+print("Aerolinea con mayor retrasos de los llegadas:")
+print(max_delay_per_airline[idx_carrier_arr, c(1,3)])
+# get the carriers
+carrier_max_dep = max_delay_per_airline[idx_carrier_dep, 1]$carrier
+carrier_max_arr = max_delay_per_airline[idx_carrier_arr, 1]$carrier
+# get the delay times
+carrier_max_dep_time = max_delay_per_airline[idx_carrier_dep, 2]$max_dep_delays
+carrier_max_arr_time = max_delay_per_airline[idx_carrier_arr, 3]$max_arr_delays
+result_tbl <- tibble(carrier = c(carrier_max_dep, carrier_max_arr), 
+                       delays =c(carrier_max_dep_time, carrier_max_arr_time) )
+
+result_tbl
+```
+**¿Cuál es la distribuciones del retraso?**
+```{r}
+dep_plot <- ggplot(flights, aes(x = dep_delay)) +
+  geom_histogram() +
+  labs(title = "Histogram of departure delays")
+
+dep_plot_qq <- ggplot(flights, aes(sample = dep_delay)) +
+  geom_qq(distribution = stats::qnorm) +
+  geom_qq_line(color = "red") +
+  labs(title = "Q-Q of departure delays")
+
+arr_plot <- ggplot(flights, aes(x = arr_delay)) +
+  geom_histogram() +
+  labs(title = "Histogram of arrival delays")
+
+arr_plot_qq <- ggplot(flights, aes(sample = arr_delay)) +
+  geom_qq(distribution = stats::qnorm) +
+  geom_qq_line(color = "red") +
+  labs(title = "Q-Q of arrival delays")
+
+dep_plot + arr_plot
+dep_plot_qq + arr_plot_qq
+
+```
+¿Cuál es el avión más retrasado?
+```{r}
+tailnum_delays <- flights %>% group_by(tailnum) %>% 
+  select( dep_delay, arr_delay) %>% 
+  summarise(dep_delays = sum(dep_delay), arr_delays = sum(arr_delay))
+
+idx_tailnum_arr <-which(tailnum_delays$arr_delays %>% max() == tailnum_delays$arr_delays)
+tailnum_most_delays_arr <- tailnum_delays$tailnum[idx_tailnum_arr]
+
+idx_tailnum_dep <-which(tailnum_delays$dep_delays %>% max() == tailnum_delays$dep_delays)
+tailnum_most_delays_dep <- tailnum_delays$tailnum[idx_tailnum_dep]
+
+
+result_tbl %>% mutate(plane_with_most_delay = c(tailnum_most_delays_dep, tailnum_most_delays_arr))
+```
+¿Cuál es el avión que más recorrió, el top 10 distancia, viajes?
+```{r}
+distance_arranged <- flights %>%group_by(tailnum) %>%  arrange(desc(distance))
+distance_arranged["distance"]
+```
+
