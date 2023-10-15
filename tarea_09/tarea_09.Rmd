@@ -40,34 +40,53 @@ n <- 500
 n_err <- 121
 p = 121/500
 log_vero <- crear_log_verosim(500, 121)
-log_verosim <- tibble(x = seq(0,1, 0.001)) %>% 
-  mutate(prob = log_vero(x) ) %>% 
-  ggplot(aes(x = x, y = prob))+
-  geom_line()
-log_verosim 
 ```
 
 
-## Pregunta: de qué parámetros depende esta ultima función
+## Pregunta: ¿de qué parámetros depende esta ultima función?
+La función **log_verosim** es una funcion "simbolico" (así se llamaria en Matlab) de la función **crear_log_verosim**. El parametar que hay que definir es la probabilidad p y se varía enter 0 y 1 en deltas de 0.001. 
 ## ¿Dónde quedaron los datos observados?
-
+En la funciòn **crear_log_verosim**. 
 #######################
 # Usa max verosimilitud para estimar el porcentaje de errores
 # en la tabla de datos de donde se sacó la muestra
 # usa la función optimize
 
 # rellena
-# optimize( , c(0, 1), maximum = TRUE)
 
+```{r}
+sol <- optimize(log_vero, c(0, 1), maximum = TRUE)
+sol$maximum
+```
 
 ########################
 # grafica la funcion de verosimilitud para p entre cero y uno
+```{r}
+grafica_tbl <- tibble(p = seq(0, 1, 0.001)) %>% 
+  mutate(prob = log_vero(p) )
+  
+g1<-ggplot(grafica_tbl, aes(x = p, y = prob)) +
+  geom_line() + 
+  geom_vline(xintercept = sol$maximum, color="red")
+g1
+```
 
-grafica_tbl <- tibble(p = seq(0, 1, 0.001))
-# ggplot()
 
 #############################
 # Repite el ejercicio anterior si observas 317 errores
+```{r}
+log_vero <- crear_log_verosim(500, 317)
+sol2 <- optimize(log_vero, c(0, 1), maximum = TRUE)
+sol2$maximum
+
+grafica_tbl2 <- tibble(p = seq(0, 1, 0.001)) %>% 
+  mutate(prob = log_vero(p) )
+  
+g2<-ggplot(grafica_tbl2, aes(x = p, y = prob)) +
+  geom_line() + 
+  geom_vline(xintercept = sol2$maximum, color="red")
+g2
+```
 
 #### Ejercicio 2: normal ####
 
