@@ -1,5 +1,5 @@
 ---
-title: "tarea_09"
+title: "tarea_09, Thomas M. Rudolf"
 output: html_document
 date: "2023-10-13"
 ---
