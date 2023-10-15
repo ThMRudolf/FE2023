@@ -94,6 +94,23 @@ g2
 # 1. Considera una muestra de variables aleatorias Gaussianas 
 # Escribe la verosimilitud para una muestra de tamaño n y después escribe la 
 # función de log-verosimilitud.
+```{r}
+create_log_Gauss_Distribution <- function(mu, sig){
+  # f(x)= 1/(sig*sqrt(2*pi))*exp(-0.5*((xi-mu)/sig)^2)
+  # log(1) = 0
+  # log(x/y) = log(x) - log(y)
+  # log(x*y) = log(x) + log(y)
+  v <- sig*sqrt(2*pi)
+  function(xi){
+    u <- (xi-mu)/sig
+    fx <- 1/(v)*exp(-0.5*(u)^2)
+    # usando log
+    log_fx <- (0 - log(sig*sqrt(2*pi)) - 0.5*u^2)
+  }
+   
+}
+```
+
 
 
 ## 2. Generamos una mu y una sigma al azar para que 
@@ -110,7 +127,9 @@ desv_est <- runif(1, 0, 2) # desviación estándar entre 0 y 2
 #simulamos una muestra con la que trabajaremos.
 
 ```{r}
+set.seed(123)
 x <- rnorm(150, mean = m, sd = desv_est)
+#log_verosim <- create_log_Gauss_Distribution(m , desv_est)
 ```
 
 #########################################
@@ -118,19 +137,41 @@ x <- rnorm(150, mean = m, sd = desv_est)
 
 
 ```{r}
-ggplot()
+gauss_tibble <- tibble(y = x)
+ggplot(gauss_tibble, aes(x = y)) + 
+  geom_histogram()
 ```
 
 
 ## Primero estima a ojo por dónde creen que esté
 ## la media y la desviación estándar
+La desviacion estandard debe estar como aprox 1.3 (8/6) y el promedio aprox. 5.
 
 ###########################
 ## 3. Estima la media y la desviación estándar usando estimador plug-in
 
 ```{r}
-media_est <- 
-  de_est <-
+get_sample <- function(sample2eval){
+  new_sample <- slice_sample(sample2eval, prop = 1, replace = TRUE)
+  return(new_sample)
+}
+calc_estim <- function(data2estim, type = "mean"){
+  estim_res <- data2estim %>% 
+    summarise(mean_gauss = mean(y), sd_gauss = sd(y))
+  
+  if(type == "mean"){
+    return(estim_res$mean_gauss)
+  }
+  if(type == "sd"){
+    return(estim_res$sd_gauss)
+  }
+}
+media_est <- tibble(mean_estim = map_dbl(1:100, ~calc_estim(get_sample(gauss_tibble), "mean"))) 
+media_est <- mean(media_est$mean_estim)
+  de_est <- tibble(sd_estim = map_dbl(1:100, ~calc_estim(get_sample(gauss_tibble), "sd"))) 
+  de_est <- mean(de_est$sd_estim)
+gauss_tibble <- gauss_tibble %>% mutate(mean_estim = media_est, sd_estim = de_est)
+gauss_tibble
 ```
 
 
