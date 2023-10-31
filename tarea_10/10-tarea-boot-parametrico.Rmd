@@ -1,0 +1,193 @@
+
+```{r}
+library(tidyverse)
+```
+## Introducción
+
+En esta tarea encontrarás la respuesta al primer ejercicio de la tarea 9, 
+y la continuación con preguntas de bootstrap paramétrico
+
+*Entrega:* martes 31 octubre por correo (usual)
+
+### Ejercicio 1: 
+crear funcion de verosim con el ejemplo de numéro de errores
+
+
+```{r}
+crear_log_verosim <- function(n, n_err){
+  # n es tamaño de muestra 
+  # n_err el número de errores detectados (datos)
+  n_corr <- n - n_err
+  log_verosim <- function(p){
+    n_err * log(p) + n_corr * log(1-p)
+  }
+}
+```
+
+ *Pregunta:* ¿qué devuelve esta función?
+ *R:* devuelve una función de un parámetro
+
+ Utiliza esta función para construir la función
+ de log verosimilitud cuando los datos observados
+ son n = 500, y le número de errores observados es 121
+
+ aquí tu codigo
+```{r}
+log_v <- crear_log_verosim(n = 500, n_err = 121)
+```
+
+
+
+
+ Usa max verosimilitud para estimar el porcentaje de errores
+ en la tabla de datos de donde se sacó la muestra
+ usa la función optimize
+
+```{r}
+optim <- optimize(log_v, interval = c(0, 1), maximum = TRUE)
+optim
+```
+
+### Grafica la funcion de verosimilitud para p entre cero y uno.
+```{r}
+grafica_tbl <- tibble(p = seq(0, 1, 0.001)) %>% 
+  mutate(log_verosimiltud = map_dbl(p, log_v))
+ggplot(grafica_tbl, aes(x = p, y = log_verosimiltud)) +
+  geom_line() +
+  geom_vline(xintercept = optim$maximum, color = "red")
+```
+
+### Repite el ejercicio anterior si observas 317 errores
+
+```{r}
+log_v <- crear_log_verosim(n = 500, n_err = 317)
+
+optim <- optimize(log_v, interval = c(0, 1), maximum = TRUE)
+optim
+
+grafica_tbl <- tibble(p = seq(0, 1, 0.001)) %>% 
+  mutate(log_verosimiltud = map_dbl(p, log_v))
+ggplot(grafica_tbl, aes(x = p, y = log_verosimiltud)) +
+  geom_line() +
+  geom_vline(xintercept = optim$maximum, color = "red")
+```
+
+
+## Boostrap paramétrico
+
+### Ejercicio 2 
+ Ahora calculamos error estándar para el ejercicio anterior usando bootstrap paramétrico
+
+*Paso 1 y 2*: argumenta que el paso 1 y 2 ya lo hicimos arriba
+*R:* Como ya tenemos la funcion de un parametro (crear_log_verosim) y igual ya tenemos muestras.
+*Pregunta:* ¿cuál es tu estimador puntual?
+*R:* la funcion "optim <- optimize(log_v, interval = c(0, 1), maximum = TRUE)" me optimiza/estima el valor de p y su valor de la funcion.
+
+
+
+*Paso 3:* la siguiente función simula bajo nuestro modelo teórico
+
+```{r}
+sim_modelo <- function(p, n){
+  # rellena: qué es p y n
+  # p es la probabilidad que occure un error
+  # n es el numero de observaciones
+  muestra <- rbinom(n, 1, p)
+  n_errores <- sum(muestra)
+  n_errores
+}
+```
+
+
+*Pregunta:* Investiga la función rbinom, ¿qué hace?
+*R:* La función rbinom(n , size, p) regresa valores n valores que pertenecen a la distribución binominal. El valor p es la probabilidad que occure el un valor entre 0 y "size".
+
+Calcula una simulación de estos datos, con alguna p y n fijas
+
+```{r}
+n = 500
+p = 0.4
+sim <- sim_modelo(p, n)
+sim
+# just for the fun of it.
+sim_n <- map_dbl(1:20, ~sim_modelo(p, n))
+sim_n
+# should be close to 200 (n*p)
+(mean(sim_n))
+```
+
+
+
+*Paso 4:* Enchufa tu estimador puntual de max verosimilitud y simula 3 mil observaciones
+
+*R tu codigo aqui:*
+```{r}
+rep_boot <- function(rep, crear_log_verosim, p, n){
+  muestra_bootstrap <- sim_modelo(p, n)
+  log_p_boot <- crear_log_verosim(n, round(muestra_bootstrap))
+  # optimization
+  res_boot <- optimize(log_p_boot, c(0,1), maximum = TRUE)
+}
+N = 3000
+p_init = 0.4
+n = 500
+sample_boot <- sim_modelo(p_init, N)
+reps_boot <- map_dfr(1:N, ~rep_boot( crear_log_verosim, p_init, n, rep = ".id"))
+reps_boot
+```
+
+
+
+
+#############################
+## Paso 5: calcula el estimador de max verosimilitud para
+## cada simulación
+
+## tu codigo aqui
+```{r}
+encontrar_mv <- function(n, n_err){
+  # log_ver <- #########
+  # res <- optimize( , c(0, 1) , maximum = TRUE)
+}
+```
+
+
+
+*Verifica que los valores que generaste son proporciones entre 0 y 1*
+
+```{r}
+idx_bigger_than_1 <- (reps_boot$maximum > 1)
+idx_smaller_than_0 <- (reps_boot$maximum < 0)
+reps_boot$maximum[idx_bigger_than_1 == TRUE]
+reps_boot$maximum[idx_smaller_than_0 == TRUE]
+```
+*R:* Tdos los valores estàn dentro de [0,1]
+
+*Paso 6:* resumen
+
+*R:* grafica un histograma de la distribución bootstrap
+```{r}
+ggplot(reps_boot, aes(x = maximum))+
+  geom_histogram(bins=50)+
+  geom_vline(xintercept = mean(reps_boot$maximum), colour = "red")
+```
+
+
+
+
+*Calcula el error estándar de tu estimacion de max verosimilitud*
+
+
+*R:  tu codigo aquí*
+
+```{r}
+library(gt)
+sd_reps_boot <- sd(reps_boot$maximum)
+mean_reps_boot <- mean(reps_boot$maximum)
+results <- tibble(parameter = c("prob", "sd_prob"), 
+                  estimator = c(mean_reps_boot, sd_reps_boot)) %>% 
+  column_to_rownames(var = "parameter") 
+results
+```
+
+
