@@ -1,0 +1,77 @@
+
+```{r}
+library(tidyverse)
+```
+
+
+Una compañía farmacéutica afirma que su nueva medicina incrementa la probabilidad de concebir un niño (sexo masculino), pero aún no publican estudios. Supón que conduces un experimento en el cual 50 parejas se seleccionan de manera aleatoria de la población, toman la medicina y conciben. Nacen 30 niños y 20 niñas.
+
+Quieres estimar la probabilidad de concebir un niño para parejas que toman la medicina. ¿Cuál es una inicial apropiada (experimenta con la distribución Beta para elegir)? No tiene que estar centrada en 0.5 pues esta corresponde a personas que no toman la medicina, y la inicial debe reflejar tu incertidumbre sobre el efecto de la droga.
+
+```{r}
+theta = c(30/50, 20/50)
+probs_inicial <- tibble(child = c("boy", "girl"), 
+                                theta = theta, 
+                                prob_inicial = c(0.6, 0.4))
+sim_inicial <- tibble(theta = rbeta(10000, 3,2))
+ggplot(sim_inicial) + geom_histogram(aes(x=theta, y=..density..), bins = 15)      
+sim_inicial <- sim_inicial %>% mutate(dist = "init")
+
+```
+
+-   Usando tu inicial de a) grafica la posterior y decide si es creíble que las parejas que toman la medicina tienen una probabilidad de 0.5 de concebir un niño.
+
+
+
+```{r}
+sim_post <- tibble(theta = rbeta(10000, 32, 22)) %>% mutate(dist = "post")
+sims <- bind_rows(sim_inicial, sim_post)
+
+ggplot(sims, aes(x=theta, fill=dist)) +
+  geom_histogram(aes(x=theta), bins=30, alpha = 0.5, position = "identity")
+quantile(sim_inicial$theta, c(0.025, 0.25, 0.5, 0.75, 0.95  )) %>%  round(2)
+quantile(sim_post$theta, c(0.025, 0.25, 0.5, 0.75, 0.95  )) %>%  round(2)
+```
+
+
+-   Supón que la farmacéutica asevera que la probabilidad de concebir un niño cuando se toma la medicina es cercana al 60% con alta certeza. Representa esta postura con una distribución inicial Beta(60,40). Comparala con la inicial de un escéptico que afirma que la medicina no hace diferencia, representa esta creencia con una inicial Beta(50, 50). ¿Cómo se compara la probabilidad posterior de concebir un niño (usando las distintas iniciales)?
+
+```{r}
+sim_famac <- tibble(theta = rbeta(10000, 60, 40)) %>% mutate(dist = "famaceutica")
+sims_post_fam <- bind_rows(sim_famac, sim_post)
+
+ggplot(sims_post_fam, aes(x=theta, fill=dist)) +
+  geom_histogram(aes(x=theta), bins=30, alpha = 0.5, position = "identity")
+
+
+```
+
+
+<!-- -->
+
+Supongamos que nos interesa analizar el IQ de una muestra de estudiantes del ITAM y suponemos que el IQ de un estudiante tiene una distribución normal $x ∼ N(θ,σ^2)$ con $σ^2$ conocida. Considera que observamos el IQ de un estudiante x. La verosimilitud del modelo es:
+
+$$ p(x|θ) = \frac{1} {\sqrt{2πσ^2} } exp^{ − \frac {1}{2σ^2} (x − θ)^2}$$
+
+<!-- -->
+
+Realizaremos un análisis bayesiano por lo que hace falta establer una distribución inicial, elegimos p(θ) que se distribuya N(μ,τ2) donde elegimos los parámetros μ,τ (τ desviación estándar) que mejor describan nuestras creencias iniciales, por ejemplo si tengo mucha certeza de que el IQ promedio se ubica en 150, elegiría μ = 150 y una desviación estándar chica, por ejemplo τ = 5. Entonces la distribución inicial es:
+
+$$ p(θ) = \frac{1} {\sqrt{2\tau^2} } exp^{ − \frac {1}{2σ^2} (θ-\mu)^2}$$
+
+```{r}
+mu = 150
+tau = 5
+N = 100000
+set.seed(123)
+sims_norm <- tibble(sim = rnorm(N, mu, tau), 
+                    x = 0:(N-1))
+ggplot(sims_norm) +
+  geom_density(aes(x = sim, y=..density..), )
+```
+
+
+
+
+Calcula la distribución posterior p(θ|x) ∝ p(x|θ)p(θ), usando la inicial y verosimilitud que definimos arriba. Una vez que realices la multiplicación debes identificar el núcleo de una distribución Normal (si tienes duda revisa Wikipedia), ¿cuáles son sus parámetros (media y varianza)?
+
