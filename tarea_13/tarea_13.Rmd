@@ -1,6 +1,6 @@
 ---
-editor_options: 
-  markdown: 
+editor_options:
+  markdown:
     wrap: 72
 ---
 
@@ -68,6 +68,7 @@ a.  Identifica la distribución posterior de λ y calcula un intervalo del
     95% de credibilidad para λ.
 
 ```{r}
+lamb <- rpois(250, 7)
 crear_sim_rep <- function(x)
 {
     n <- length(x)
@@ -77,11 +78,22 @@ crear_sim_rep <- function(x)
       tibble(rep = rep, x_rep = x_rep)
   }
 }
+sim_rep <- crear_sim_rep(lamb)
+lineup_tbl <- map(1:5, ~sim_rep(.x)) %>% 
+  bind_rows() %>% 
+  bind_rows(tibble(rep=6, x_rep = lamb))
+ggplot(lineup_tbl, aes(x = x_rep))  +
+  geom_histogram(bins = 15) +
+  facet_wrap(~rep)
 ```
 
 a.  Simula de la distribución predictiva posterior para diagnosticar si
     el modelo Poisson es apropiado para nuestros datos (revisa el
     ejemplo de clase, deberás simular conjuntos de datos del mismo
     tamaño que los datos observados.
-b.  Utiliza la distribución predictiva posterior para crear un intervalo
+
+```{}
+```
+
+a.  Utiliza la distribución predictiva posterior para crear un intervalo
     del 95% para una nueva observación.
