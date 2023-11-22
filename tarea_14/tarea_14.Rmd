@@ -141,7 +141,9 @@ otra estadistica: desviacion estandard
 ```{r}
 # logaritmo de 
 log_f_dist2 <- function(x) {
- dnorm(x, 1, 0.5)
+ z<-dnorm(x, 1, 0.5)
+ #log(z)
+ z
 }
   
 ```
